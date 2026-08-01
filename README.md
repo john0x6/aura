@@ -84,6 +84,24 @@ duomenys jau nuskaityti. Kitaip vartotojas akimirką pamatytų tuščią sąraš
   `aura-standalone.html` šriftai įrašyti base64 — failas neatlieka **nė vienos** išorinės užklausos.
 - **Atsiliepimai** (`Nustatymai → Atsiliepimas`) atidaro `mailto:` su versija, platforma ir kalba.
   Dienyno turinys nesiunčiamas niekada — tai sveikatos duomenys.
+- **Kvėpavimas pateikiamas tik kaip atsipalaidavimo pratimas.** Jokioje vietoje — sąsajoje,
+  pranešimuose ar parduotuvės aprašyme — negalima teigti, kad jis mažina ar užkerta kelią
+  priepuoliams. Ankstesnis tekstas („mažina stresą — vieną iš dažniausių priepuolių trigerių“)
+  buvo pašalintas būtent dėl to.
+- **Pašalinti trigeriai lieka vertimų žodyne.** `TRIGGER_IDS` apkarpytas iki trijų, bet `t.tg`
+  saugo visus senus raktus — kitaip seni įrašai rodytų vidinius ID vietoj teksto.
+- **`src/backup.js`** — eksportas nuskaito **visus** Preferences raktus (`Preferences.keys()`), ne
+  vien `aura-data`, kad ateity pridėti raktai nebūtų tyliai praleisti. Failas rašomas į `Directory.Cache`
+  ir atiduodamas per Android dalinimosi langą — tinklo kodo nėra jokio.
+  Importas: validacija → **automatinė esamų duomenų kopija** → `Preferences.clear()` → atkūrimas.
+  `schemaVersion` naujesnis už programėlės atmetamas; senesnis priimamas.
+- **`src/seizureTimer.js`** — `startedAt` rašomas **tiesiai į Preferences**, apeinant pagrindinį
+  įrašymą: `update()` yra debounce'intas 700 ms, ir nužudžius programėlę per tą langą priepuolio
+  pradžia dingtų. Praėjęs laikas visada skaičiuojamas iš sieninio laikrodžio, todėl fone praleistas
+  laikas neprarandamas. Ties 5:00 — raudonas įspėjimas (status epilepticus); programėlė **neskambina**
+  pati. Laikmatis, veikiantis >1 h, laikomas nepatikimu ir vietoj trukmės rodo klausimą.
+  Išmatuotos sekundės saugomos kaip `durSec`, o `dur` intervalas išvedamas iš jų — senoji ataskaitos
+  logika nesulūžta.
 - **`src/dates.js`** — `dkey()` bendras `App.jsx` ir planuokliui. Nesutapimas tyliai sugadintų
   pakartojimų atšaukimą, todėl funkcija sąmoningai viena.
 

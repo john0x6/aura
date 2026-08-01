@@ -3,6 +3,9 @@ import { load as loadData, save as saveData, clear as clearData } from "./storag
 import { syncMedReminders, initChannel, permissionState, requestPermission, isNative,
          cancelDose, restoreDose, pendingCount, FOLLOWUP_MIN } from "./notifications";
 import { pad, dkey, todayKey, addDays } from "./dates";
+import { syncBackupReminder } from "./notifications";
+import { exportBackup, validateBackup, restoreBackup } from "./backup";
+import { startTimer, loadTimer, clearTimer, elapsedSec, isStale, fmtDuration, bucketOf, ALERT_SEC } from "./seizureTimer";
 import { hideSplash, initStatusBar, onBackButton, onResume, exitApp } from "./native";
 import { Pill, Zap, Activity, NotebookPen, Plus, X, Check, Trash2, Minus, Wind, CalendarDays, ChevronLeft, ChevronRight, Play, Square, FileText, Settings as Cog, Pencil, Pause } from "lucide-react";
 
@@ -70,7 +73,7 @@ const STR = {
     pBox: "Dėžutė 4·4·4·4", pRelax: "Ramybei 4·7·8", start: "Pradėti", stop: "Stabdyti",
     remaining: (n) => `liko ${n} min`, doneMin: (n) => `Baigta — ${n} min ✓`, stoppedMin: (n) => `Sustabdyta — ${n} min įrašyta`,
     thisMonth: "Šį mėnesį", sessions: "seansai", minTotal: "min iš viso",
-    calmHint: "Lėtas kvėpavimas mažina stresą — vieną iš dažniausių priepuolių trigerių.",
+    calmHint: "Lėto kvėpavimo pratimas atsipalaidavimui.",
     segState: "Būsena", segCalm: "Kvėpavimas",
     todayState: "Šiandienos būsena", sleep: "Miegas", stress: "Stresas", fatigue: "Nuovargis", alcohol: "Alkoholis",
     yes: "Taip", no: "Ne", optNote: "Pastaba (nebūtina)", autosave: "Įrašoma automatiškai.",
@@ -88,7 +91,7 @@ const STR = {
     settings: "Nustatymai", language: "Kalba", profile: "Profilis", namePh: "Vardas (rodomas ataskaitoje)",
     overdueAfter: "Dozė žymima „praleista?“ po:", data: "Duomenys", exportJson: "Eksportuoti duomenis (JSON)",
     deleteAll: "Ištrinti visus duomenis", confirmAll: "Tikrai ištrinti viską? Negrįžtama", about: "Apie",
-    aboutText: "Aura · prototipas v0.9. Duomenys saugomi tik tavo paskyroje. Programėlė nėra medicinos prietaisas — priepuolių detekcijai naudok sertifikuotus įrenginius, o skubiai informacijai užsipildyk telefono Medical ID.",
+    aboutText: "Aura · prototipas v1.2. Duomenys saugomi tik tavo paskyroje. Programėlė nėra medicinos prietaisas — priepuolių detekcijai naudok sertifikuotus įrenginius, o skubiai informacijai užsipildyk telefono Medical ID.",
     aura: "Aura", edit: "Redaguoti", editSeiz: "Redaguoti priepuolį", editEvent: "Redaguoti įrašą",
     unanswered: "neatsakyta", rAnswered: (a, b) => `atsakyta ${a} iš ${b}`,
     sum30: "Per 30 dienų", sumSeiz: "priepuoliai", sumAdh: "vaistų", sumSleep: "miegas",
@@ -106,6 +109,36 @@ const STR = {
     fbPh: "Kas nutiko arba ką norėtum pakeisti? Jei tai klaida — kaip ją pakartoti?",
     fbAttach: "Bus prisegta", fbSend: "Siųsti", fbCopy: "Kopijuoti tekstą",
     fbSent: "Atsidarė pašto programa", fbFallback: "Jei pašto programa neatsidarė, nukopijuok tekstą ir atsiųsk į", fbNoText: "Įrašyk, kas nutiko",
+    backup: "Atsarginė kopija", bkMake: "Sukurti kopiją", bkRestore: "Atkurti iš kopijos",
+    bkHint: "Failas su visais duomenimis. Išsaugok jį sau — pametus telefoną tai vienintelis kelias atgauti dienyną.",
+    bkDone: "Kopija sukurta", bkFail: "Nepavyko sukurti kopijos",
+    bkRemind: "Priminti kas mėnesį", bkChecking: "Tikrinama…",
+    bkFound: "Rasta kopija", bkFrom: "Sukurta", bkWill: "Bus atkurta",
+    bkWarn: "Esami duomenys bus pakeisti. Prieš tai automatiškai išsaugoma dabartinių duomenų kopija.",
+    bkConfirm: "Atkurti", bkOk: "Duomenys atkurti", bkPick: "Pasirinkti failą",
+    bkErrParse: "Failas nėra tinkamas JSON.", bkErrShape: "Tai ne Aura atsarginė kopija.",
+    bkErrNewer: "Kopija sukurta naujesne programėlės versija. Atnaujink Aurą.",
+    bkErrEmpty: "Kopija tuščia.",
+    seizStart: "Prasidėjo priepuolis", seizEnd: "Priepuolis baigėsi", seizRunning: "Vyksta priepuolis",
+    seizAlert: "Užsitęsęs priepuolis — kvieskite pagalbą (112)",
+    seizAlertNote: "Programėlė neskambina pati.",
+    seizStale: "Ar priepuolis jau baigėsi?",
+    seizStaleNote: "Laikmatis veikia ilgiau nei valandą. Jei pamiršai jį sustabdyti, trukmė bus netiksli.",
+    seizStaleYes: "Taip, baigėsi", seizStaleDiscard: "Atmesti laikmatį",
+    measured: "išmatuota", startedAt: "Pradžia",
+    auraFeel: "Jaučiu aurą", auraLogged: "Aura užfiksuota", auraLinked: "Susieta su aura prieš {n} min.",
+    breathe: "Kvėpavimas", breatheNote: "Atsipalaidavimo pratimas.", close: "Uždaryti",
+    trigOther: "Kita", trigOtherPh: "Įrašyk savo žodžiais",
+    fbCardText: "Aura — mano asmeninis projektas, kuriamas laisvalaikiu. Jei kažko trūksta arba kažkas veikia blogai, parašyk — tai vienintelis būdas man sužinoti.",
+    fbCardYes: "Parašyti", fbCardNo: "Ne dabar",
+    guide: "Kaip naudotis", guideIntro: "Trumpai apie tai, kas nėra akivaizdu iš pirmo žvilgsnio.",
+    gSeiz: "Priepuolio registravimas", gSeizB: "Paspausk „Prasidėjo priepuolis“ — trukmė matuojama pati, jos vesti nereikia. Laikmatis veikia ir uždarius programėlę ar telefonui persikrovus. Ties 5 min ekranas parausta ir įspėja; programėlė neskambina pati, skambinti reikia tau arba šalia esančiam žmogui. Paspaudus „Priepuolis baigėsi“ atsidaro forma su jau įrašyta pradžia ir trukme — visa kita pildyti nebūtina.",
+    gAura: "Aura", gAuraB: "„Jaučiu aurą“ užfiksuoja laiką ir atidaro kvėpavimo pratimą atsipalaidavimui. Jei per valandą po auros užregistruosi priepuolį, aura ir priepuolis bus susieti automatiškai.",
+    gMeds: "Vaistai ir priminimai", gMedsB: "Pridėk vaistą su vartojimo laikais ir pažymėk kiekvieną dozę paspaudimu. Nepažymėjus, po 30 min ateis vienas pakartojimas. Kad priminimai ateitų laiku, telefono nustatymuose leisk Aurai veikti be baterijos apribojimų — „Netrukdyti“ režimas juos vis tiek nutildo.",
+    gReport: "Ataskaita gydytojui", gReportB: "Tai pagrindinė priežastis vesti dienyną. Programėlė iš įrašų suskaičiuoja vaistų laikymosi procentą, trigerius pagal dažnį ir miegą prieš priepuolius. Ataskaitą galima nukopijuoti tekstu ir nusiųsti gydytojui.",
+    gBackup: "Atsarginė kopija", gBackupB: "Duomenys saugomi tik šiame telefone — debesyje jų nėra. Pametus ar sugadinus telefoną kopija yra vienintelis kelias atgauti dienyną. Pasidaryk ją kas mėnesį ir išsisaugok sau į el. paštą arba Drive.",
+    gPrivacy: "Privatumas", gPrivacyB: "Įrašai niekada neišeina iš telefono: nėra paskyros, serverio ir jokių tinklo užklausų. Atsiliepimą siunčiant prisegama tik programėlės versija ir įrenginio tipas, dienyno turinys — ne.",
+    gDisc: "Aura nėra medicinos prietaisas ir nekeičia gydytojo. Priepuolių aptikimui skirti sertifikuoti įrenginiai, o skubiai informacijai užrakintame ekrane užsipildyk telefono Medical ID.",
     ty: { tonicClonic: "Toninis-kloninis", absence: "Absansas", focal: "Židininis", myoclonic: "Miokloninis", other: "Kitas", unspec: "Nenurodyta" },
     ef: { fall: "Nukritau", injury: "Susižalojau", tongue: "Prikandau liežuvį", incontinence: "Šlapimo nelaikymas" },
     tg: { insomnia: "Nemiga", stress: "Stresas", fatigue: "Pervargimas", alcohol: "Alkoholis", missedMeds: "Praleisti vaistai", missedMeal: "Praleistas valgis", flashing: "Mirganti šviesa", illness: "Liga / karščiavimas", unknown: "Nežinoma" },
@@ -137,7 +170,7 @@ const STR = {
     pBox: "Box 4·4·4·4", pRelax: "Calming 4·7·8", start: "Start", stop: "Stop",
     remaining: (n) => `${n} min left`, doneMin: (n) => `Done — ${n} min ✓`, stoppedMin: (n) => `Stopped — ${n} min saved`,
     thisMonth: "This month", sessions: "sessions", minTotal: "min total",
-    calmHint: "Slow breathing lowers stress — one of the most common seizure triggers.",
+    calmHint: "A slow breathing exercise for relaxation.",
     segState: "State", segCalm: "Breathing",
     todayState: "Today's state", sleep: "Sleep", stress: "Stress", fatigue: "Fatigue", alcohol: "Alcohol",
     yes: "Yes", no: "No", optNote: "Note (optional)", autosave: "Saved automatically.",
@@ -155,7 +188,7 @@ const STR = {
     settings: "Settings", language: "Language", profile: "Profile", namePh: "Name (shown in the report)",
     overdueAfter: "Mark a dose as “missed?” after:", data: "Data", exportJson: "Export data (JSON)",
     deleteAll: "Delete all data", confirmAll: "Delete everything? This cannot be undone", about: "About",
-    aboutText: "Aura · prototype v0.9. Data is stored only in your account. This app is not a medical device — use certified devices for seizure detection, and fill in your phone's Medical ID for emergencies.",
+    aboutText: "Aura · prototype v1.2. Data is stored only in your account. This app is not a medical device — use certified devices for seizure detection, and fill in your phone's Medical ID for emergencies.",
     aura: "Aura", edit: "Edit", editSeiz: "Edit seizure", editEvent: "Edit entry",
     unanswered: "not answered", rAnswered: (a, b) => `answered ${a} of ${b}`,
     sum30: "Last 30 days", sumSeiz: "seizures", sumAdh: "meds", sumSleep: "sleep",
@@ -173,6 +206,36 @@ const STR = {
     fbPh: "What happened, or what would you change? If it is a bug — how do you reproduce it?",
     fbAttach: "Will be attached", fbSend: "Send", fbCopy: "Copy text",
     fbSent: "Mail app opened", fbFallback: "If your mail app did not open, copy the text and send it to", fbNoText: "Describe what happened",
+    backup: "Backup", bkMake: "Create backup", bkRestore: "Restore from backup",
+    bkHint: "A file with all your data. Keep it somewhere safe — if you lose the phone, this is the only way back.",
+    bkDone: "Backup created", bkFail: "Backup failed",
+    bkRemind: "Remind monthly", bkChecking: "Checking…",
+    bkFound: "Backup found", bkFrom: "Created", bkWill: "Will be restored",
+    bkWarn: "Current data will be replaced. A copy of it is saved automatically first.",
+    bkConfirm: "Restore", bkOk: "Data restored", bkPick: "Choose file",
+    bkErrParse: "The file is not valid JSON.", bkErrShape: "This is not an Aura backup.",
+    bkErrNewer: "This backup was made by a newer version. Please update Aura.",
+    bkErrEmpty: "The backup is empty.",
+    seizStart: "Seizure started", seizEnd: "Seizure ended", seizRunning: "Seizure in progress",
+    seizAlert: "Prolonged seizure — call emergency services",
+    seizAlertNote: "The app does not dial for you.",
+    seizStale: "Is the seizure over?",
+    seizStaleNote: "The timer has been running for over an hour. If you forgot to stop it, the duration will be wrong.",
+    seizStaleYes: "Yes, it ended", seizStaleDiscard: "Discard timer",
+    measured: "measured", startedAt: "Started",
+    auraFeel: "I feel an aura", auraLogged: "Aura logged", auraLinked: "Linked to an aura {n} min ago",
+    breathe: "Breathing", breatheNote: "A relaxation exercise.", close: "Close",
+    trigOther: "Other", trigOtherPh: "Describe in your own words",
+    fbCardText: "Aura is my personal project, built in my spare time. If something is missing or something works badly, write to me — it is the only way I get to know.",
+    fbCardYes: "Write to me", fbCardNo: "Not now",
+    guide: "How to use", guideIntro: "The short version of what is not obvious at first glance.",
+    gSeiz: "Logging a seizure", gSeizB: "Tap “Seizure started” — the duration is measured for you, there is nothing to type. The timer keeps running if you close the app or the phone restarts. At 5 minutes the screen turns red and warns you; the app does not dial, you or someone nearby has to call. “Seizure ended” opens a form with the start time and duration already filled in — everything else is optional.",
+    gAura: "Aura", gAuraB: "“I feel an aura” records the time and opens a breathing exercise for relaxation. If you log a seizure within an hour of the aura, the aura and the seizure are linked automatically.",
+    gMeds: "Medication and reminders", gMedsB: "Add a medication with its times and mark each dose with a tap. If you do not, one follow-up arrives 30 minutes later. For reminders to arrive on time, allow Aura to run without battery restrictions in your phone settings — Do Not Disturb will still silence them.",
+    gReport: "Report for your doctor", gReportB: "This is the main reason to keep a diary. The app works out your adherence percentage, triggers ranked by frequency and sleep before seizures. You can copy the report as text and send it to your doctor.",
+    gBackup: "Backup", gBackupB: "Your data lives only on this phone — there is no cloud copy. If the phone is lost or broken, a backup is the only way back. Make one monthly and send it to yourself by email or Drive.",
+    gPrivacy: "Privacy", gPrivacyB: "Entries never leave the phone: no account, no server, no network requests at all. Feedback attaches only the app version and device type, never diary content.",
+    gDisc: "Aura is not a medical device and does not replace your doctor. Use certified devices for seizure detection, and fill in your phone's Medical ID for emergency information on the lock screen.",
     ty: { tonicClonic: "Tonic-clonic", absence: "Absence", focal: "Focal", myoclonic: "Myoclonic", other: "Other", unspec: "Unspecified" },
     ef: { fall: "I fell", injury: "Injured myself", tongue: "Bit my tongue", incontinence: "Incontinence" },
     tg: { insomnia: "Poor sleep", stress: "Stress", fatigue: "Exhaustion", alcohol: "Alcohol", missedMeds: "Missed meds", missedMeal: "Missed meal", flashing: "Flashing lights", illness: "Illness / fever", unknown: "Unknown" },
@@ -204,7 +267,7 @@ const STR = {
     pBox: "Квадрат 4·4·4·4", pRelax: "Расслабление 4·7·8", start: "Начать", stop: "Остановить",
     remaining: (n) => `осталось ${n} мин`, doneMin: (n) => `Готово — ${n} мин ✓`, stoppedMin: (n) => `Остановлено — ${n} мин записано`,
     thisMonth: "В этом месяце", sessions: "сеансы", minTotal: "мин всего",
-    calmHint: "Медленное дыхание снижает стресс — один из самых частых триггеров приступов.",
+    calmHint: "Упражнение на медленное дыхание для расслабления.",
     segState: "Состояние", segCalm: "Дыхание",
     todayState: "Состояние сегодня", sleep: "Сон", stress: "Стресс", fatigue: "Усталость", alcohol: "Алкоголь",
     yes: "Да", no: "Нет", optNote: "Заметка (необязательно)", autosave: "Сохраняется автоматически.",
@@ -222,7 +285,7 @@ const STR = {
     settings: "Настройки", language: "Язык", profile: "Профиль", namePh: "Имя (показывается в отчёте)",
     overdueAfter: "Отмечать дозу «пропущено?» через:", data: "Данные", exportJson: "Экспорт данных (JSON)",
     deleteAll: "Удалить все данные", confirmAll: "Точно удалить всё? Необратимо", about: "О приложении",
-    aboutText: "Aura · прототип v0.9. Данные хранятся только в вашей учётной записи. Приложение не медицинский прибор — для обнаружения приступов используйте сертифицированные устройства, а для экстренных случаев заполните Medical ID в телефоне.",
+    aboutText: "Aura · прототип v1.2. Данные хранятся только в вашей учётной записи. Приложение не медицинский прибор — для обнаружения приступов используйте сертифицированные устройства, а для экстренных случаев заполните Medical ID в телефоне.",
     aura: "Аура", edit: "Изменить", editSeiz: "Изменить приступ", editEvent: "Изменить запись",
     unanswered: "нет ответа", rAnswered: (a, b) => `отвечено ${a} из ${b}`,
     sum30: "За 30 дней", sumSeiz: "приступы", sumAdh: "лекарства", sumSleep: "сон",
@@ -240,6 +303,36 @@ const STR = {
     fbPh: "Что произошло или что хотели бы изменить? Если ошибка — как её повторить?",
     fbAttach: "Будет приложено", fbSend: "Отправить", fbCopy: "Скопировать текст",
     fbSent: "Почтовое приложение открыто", fbFallback: "Если почта не открылась, скопируйте текст и отправьте на", fbNoText: "Опишите, что произошло",
+    backup: "Резервная копия", bkMake: "Создать копию", bkRestore: "Восстановить из копии",
+    bkHint: "Файл со всеми данными. Сохраните его — при утере телефона это единственный способ вернуть дневник.",
+    bkDone: "Копия создана", bkFail: "Не удалось создать копию",
+    bkRemind: "Напоминать ежемесячно", bkChecking: "Проверка…",
+    bkFound: "Копия найдена", bkFrom: "Создана", bkWill: "Будет восстановлено",
+    bkWarn: "Текущие данные будут заменены. Их копия сохраняется автоматически.",
+    bkConfirm: "Восстановить", bkOk: "Данные восстановлены", bkPick: "Выбрать файл",
+    bkErrParse: "Файл не является корректным JSON.", bkErrShape: "Это не резервная копия Aura.",
+    bkErrNewer: "Копия создана более новой версией. Обновите Aura.",
+    bkErrEmpty: "Копия пуста.",
+    seizStart: "Приступ начался", seizEnd: "Приступ закончился", seizRunning: "Идёт приступ",
+    seizAlert: "Затяжной приступ — вызовите скорую",
+    seizAlertNote: "Приложение не звонит само.",
+    seizStale: "Приступ уже закончился?",
+    seizStaleNote: "Таймер идёт более часа. Если вы забыли его остановить, длительность будет неверной.",
+    seizStaleYes: "Да, закончился", seizStaleDiscard: "Отменить таймер",
+    measured: "измерено", startedAt: "Начало",
+    auraFeel: "Чувствую ауру", auraLogged: "Аура записана", auraLinked: "Связано с аурой {n} мин назад",
+    breathe: "Дыхание", breatheNote: "Упражнение на расслабление.", close: "Закрыть",
+    trigOther: "Другое", trigOtherPh: "Опишите своими словами",
+    fbCardText: "Aura — мой личный проект, который я делаю в свободное время. Если чего-то не хватает или что-то работает плохо, напишите — это единственный способ мне об этом узнать.",
+    fbCardYes: "Написать", fbCardNo: "Не сейчас",
+    guide: "Как пользоваться", guideIntro: "Коротко о том, что не очевидно с первого взгляда.",
+    gSeiz: "Запись приступа", gSeizB: "Нажмите «Приступ начался» — длительность измеряется сама, вводить ничего не нужно. Таймер продолжает идти, даже если закрыть приложение или перезагрузить телефон. На 5-й минуте экран краснеет и предупреждает; приложение не звонит само, звонить должны вы или человек рядом. «Приступ закончился» открывает форму с уже заполненным началом и длительностью — остальное по желанию.",
+    gAura: "Аура", gAuraB: "«Чувствую ауру» записывает время и открывает дыхательное упражнение для расслабления. Если в течение часа после ауры записать приступ, аура и приступ свяжутся автоматически.",
+    gMeds: "Лекарства и напоминания", gMedsB: "Добавьте лекарство со временем приёма и отмечайте каждую дозу касанием. Если не отметить, через 30 минут придёт одно повторное напоминание. Чтобы напоминания приходили вовремя, разрешите Aura работать без ограничений батареи — режим «Не беспокоить» всё равно их заглушит.",
+    gReport: "Отчёт для врача", gReportB: "Это главная причина вести дневник. Приложение считает процент соблюдения приёма, триггеры по частоте и сон перед приступами. Отчёт можно скопировать текстом и отправить врачу.",
+    gBackup: "Резервная копия", gBackupB: "Данные хранятся только на этом телефоне — в облаке их нет. При утере или поломке копия — единственный способ вернуть дневник. Делайте её ежемесячно и отправляйте себе на почту или в Drive.",
+    gPrivacy: "Приватность", gPrivacyB: "Записи никогда не покидают телефон: нет аккаунта, сервера и сетевых запросов. К отзыву прилагается только версия приложения и тип устройства, содержимое дневника — нет.",
+    gDisc: "Aura не является медицинским прибором и не заменяет врача. Для обнаружения приступов используйте сертифицированные устройства, а для экстренной информации на экране блокировки заполните Medical ID.",
     ty: { tonicClonic: "Тонико-клонический", absence: "Абсанс", focal: "Фокальный", myoclonic: "Миоклонический", other: "Другой", unspec: "Не указан" },
     ef: { fall: "Упал(а)", injury: "Травма", tongue: "Прикус языка", incontinence: "Недержание мочи" },
     tg: { insomnia: "Недосып", stress: "Стресс", fatigue: "Переутомление", alcohol: "Алкоголь", missedMeds: "Пропуск лекарств", missedMeal: "Пропуск еды", flashing: "Мерцающий свет", illness: "Болезнь / жар", unknown: "Неизвестно" },
@@ -271,7 +364,7 @@ const STR = {
     pBox: "Kwadrat 4·4·4·4", pRelax: "Uspokojenie 4·7·8", start: "Zacznij", stop: "Zatrzymaj",
     remaining: (n) => `pozostało ${n} min`, doneMin: (n) => `Gotowe — ${n} min ✓`, stoppedMin: (n) => `Zatrzymano — zapisano ${n} min`,
     thisMonth: "W tym miesiącu", sessions: "sesje", minTotal: "min łącznie",
-    calmHint: "Powolny oddech obniża stres — jeden z najczęstszych wyzwalaczy napadów.",
+    calmHint: "Ćwiczenie powolnego oddechu dla relaksu.",
     segState: "Stan", segCalm: "Oddech",
     todayState: "Dzisiejszy stan", sleep: "Sen", stress: "Stres", fatigue: "Zmęczenie", alcohol: "Alkohol",
     yes: "Tak", no: "Nie", optNote: "Notatka (opcjonalnie)", autosave: "Zapisywane automatycznie.",
@@ -289,7 +382,7 @@ const STR = {
     settings: "Ustawienia", language: "Język", profile: "Profil", namePh: "Imię (widoczne w raporcie)",
     overdueAfter: "Oznacz dawkę „pominięto?” po:", data: "Dane", exportJson: "Eksportuj dane (JSON)",
     deleteAll: "Usuń wszystkie dane", confirmAll: "Na pewno usunąć wszystko? Nieodwracalne", about: "O aplikacji",
-    aboutText: "Aura · prototyp v0.9. Dane są przechowywane tylko na Twoim koncie. Aplikacja nie jest wyrobem medycznym — do wykrywania napadów używaj certyfikowanych urządzeń, a na wypadek nagły wypełnij Medical ID w telefonie.",
+    aboutText: "Aura · prototyp v1.2. Dane są przechowywane tylko na Twoim koncie. Aplikacja nie jest wyrobem medycznym — do wykrywania napadów używaj certyfikowanych urządzeń, a na wypadek nagły wypełnij Medical ID w telefonie.",
     aura: "Aura", edit: "Edytuj", editSeiz: "Edytuj napad", editEvent: "Edytuj wpis",
     unanswered: "brak odpowiedzi", rAnswered: (a, b) => `odpowiedzi: ${a} z ${b}`,
     sum30: "Ostatnie 30 dni", sumSeiz: "napady", sumAdh: "leki", sumSleep: "sen",
@@ -307,6 +400,36 @@ const STR = {
     fbPh: "Co się stało lub co chciałbyś zmienić? Jeśli to błąd — jak go powtórzyć?",
     fbAttach: "Zostanie dołączone", fbSend: "Wyślij", fbCopy: "Kopiuj tekst",
     fbSent: "Otwarto aplikację pocztową", fbFallback: "Jeśli poczta się nie otworzyła, skopiuj tekst i wyślij na", fbNoText: "Opisz, co się stało",
+    backup: "Kopia zapasowa", bkMake: "Utwórz kopię", bkRestore: "Przywróć z kopii",
+    bkHint: "Plik ze wszystkimi danymi. Zachowaj go — po utracie telefonu to jedyny sposób odzyskania dziennika.",
+    bkDone: "Kopia utworzona", bkFail: "Nie udało się utworzyć kopii",
+    bkRemind: "Przypominaj co miesiąc", bkChecking: "Sprawdzanie…",
+    bkFound: "Znaleziono kopię", bkFrom: "Utworzona", bkWill: "Zostanie przywrócone",
+    bkWarn: "Obecne dane zostaną zastąpione. Ich kopia jest zapisywana automatycznie.",
+    bkConfirm: "Przywróć", bkOk: "Dane przywrócone", bkPick: "Wybierz plik",
+    bkErrParse: "Plik nie jest poprawnym JSON.", bkErrShape: "To nie jest kopia zapasowa Aura.",
+    bkErrNewer: "Kopia pochodzi z nowszej wersji. Zaktualizuj Aurę.",
+    bkErrEmpty: "Kopia jest pusta.",
+    seizStart: "Napad się zaczął", seizEnd: "Napad się skończył", seizRunning: "Trwa napad",
+    seizAlert: "Przedłużający się napad — wezwij pogotowie",
+    seizAlertNote: "Aplikacja nie dzwoni samodzielnie.",
+    seizStale: "Czy napad już się skończył?",
+    seizStaleNote: "Stoper działa ponad godzinę. Jeśli zapomniałeś go zatrzymać, czas będzie błędny.",
+    seizStaleYes: "Tak, skończył się", seizStaleDiscard: "Odrzuć stoper",
+    measured: "zmierzone", startedAt: "Początek",
+    auraFeel: "Czuję aurę", auraLogged: "Aura zapisana", auraLinked: "Powiązane z aurą sprzed {n} min",
+    breathe: "Oddech", breatheNote: "Ćwiczenie relaksacyjne.", close: "Zamknij",
+    trigOther: "Inne", trigOtherPh: "Opisz własnymi słowami",
+    fbCardText: "Aura to mój osobisty projekt, tworzony po godzinach. Jeśli czegoś brakuje albo coś działa źle, napisz — to jedyny sposób, żebym się o tym dowiedział.",
+    fbCardYes: "Napisz", fbCardNo: "Nie teraz",
+    guide: "Jak korzystać", guideIntro: "Krótko o tym, co nie jest oczywiste na pierwszy rzut oka.",
+    gSeiz: "Zapisywanie napadu", gSeizB: "Naciśnij „Napad się zaczął” — czas jest mierzony automatycznie, nic nie trzeba wpisywać. Stoper działa nawet po zamknięciu aplikacji lub restarcie telefonu. Po 5 minutach ekran robi się czerwony i ostrzega; aplikacja nie dzwoni sama, zadzwonić musisz Ty lub osoba obok. „Napad się skończył” otwiera formularz z już wpisanym początkiem i czasem trwania — reszta jest opcjonalna.",
+    gAura: "Aura", gAuraB: "„Czuję aurę” zapisuje godzinę i otwiera ćwiczenie oddechowe dla relaksu. Jeśli w ciągu godziny od aury zapiszesz napad, aura i napad zostaną automatycznie powiązane.",
+    gMeds: "Leki i przypomnienia", gMedsB: "Dodaj lek z porami przyjmowania i oznaczaj każdą dawkę dotknięciem. Jeśli tego nie zrobisz, po 30 minutach przyjdzie jedno ponowne przypomnienie. Aby przypomnienia przychodziły na czas, pozwól Aurze działać bez ograniczeń baterii — tryb „Nie przeszkadzać” i tak je wyciszy.",
+    gReport: "Raport dla lekarza", gReportB: "To główny powód prowadzenia dziennika. Aplikacja wylicza procent przestrzegania leczenia, wyzwalacze według częstości i sen przed napadami. Raport można skopiować jako tekst i wysłać lekarzowi.",
+    gBackup: "Kopia zapasowa", gBackupB: "Dane są tylko na tym telefonie — nie ma kopii w chmurze. Po utracie lub awarii telefonu kopia to jedyny sposób odzyskania dziennika. Rób ją co miesiąc i wysyłaj sobie e-mailem lub na Drive.",
+    gPrivacy: "Prywatność", gPrivacyB: "Wpisy nigdy nie opuszczają telefonu: brak konta, serwera i jakichkolwiek zapytań sieciowych. Do opinii dołączana jest tylko wersja aplikacji i typ urządzenia, nigdy treść dziennika.",
+    gDisc: "Aura nie jest wyrobem medycznym i nie zastępuje lekarza. Do wykrywania napadów używaj certyfikowanych urządzeń, a na wypadek nagły wypełnij Medical ID w telefonie.",
     ty: { tonicClonic: "Toniczno-kloniczny", absence: "Napad nieświadomości", focal: "Ogniskowy", myoclonic: "Miokloniczny", other: "Inny", unspec: "Nieokreślony" },
     ef: { fall: "Upadek", injury: "Uraz", tongue: "Przygryzienie języka", incontinence: "Nietrzymanie moczu" },
     tg: { insomnia: "Niedobór snu", stress: "Stres", fatigue: "Przemęczenie", alcohol: "Alkohol", missedMeds: "Pominięte leki", missedMeal: "Pominięty posiłek", flashing: "Migające światło", illness: "Choroba / gorączka", unknown: "Nieznane" },
@@ -322,6 +445,7 @@ const NOTIF = {
     title: "Laikas išgerti vaistus", body: (m) => `${m.name}${m.dose ? " · " + m.dose : ""}`,
     fuTitle: "Dozė nepažymėta", fuBody: (m) => `${m.name} — ar tikrai išgėrei?`,
     channel: "Vaistų priminimai", label: "Priminimai",
+    bkTitle: "Pasidaryk atsarginę kopiją", bkBody: "Dienyno duomenys saugomi tik šiame telefone.", bkChannel: "Kopijos priminimai",
     diag: "Suplanuota priminimų", diagRun: "Tikrinti", diagNone: "nėra",
     desc: "Kasdieniai pranešimai pagal vaistų vartojimo laikus.",
     on: "Įjungti", off: "Išjungti",
@@ -332,6 +456,7 @@ const NOTIF = {
     title: "Time to take your medication", body: (m) => `${m.name}${m.dose ? " · " + m.dose : ""}`,
     fuTitle: "Dose not marked", fuBody: (m) => `${m.name} — did you actually take it?`,
     channel: "Medication reminders", label: "Reminders",
+    bkTitle: "Time to back up", bkBody: "Your diary is stored only on this phone.", bkChannel: "Backup reminders",
     diag: "Scheduled reminders", diagRun: "Check", diagNone: "none",
     desc: "Daily notifications based on your dose times.",
     on: "On", off: "Off",
@@ -342,6 +467,7 @@ const NOTIF = {
     title: "Время принять лекарство", body: (m) => `${m.name}${m.dose ? " · " + m.dose : ""}`,
     fuTitle: "Доза не отмечена", fuBody: (m) => `${m.name} — вы действительно приняли?`,
     channel: "Напоминания о лекарствах", label: "Напоминания",
+    bkTitle: "Сделайте резервную копию", bkBody: "Дневник хранится только на этом телефоне.", bkChannel: "Напоминания о копиях",
     diag: "Запланировано напоминаний", diagRun: "Проверить", diagNone: "нет",
     desc: "Ежедневные уведомления по времени приёма.",
     on: "Вкл.", off: "Выкл.",
@@ -352,6 +478,7 @@ const NOTIF = {
     title: "Czas wziąć lek", body: (m) => `${m.name}${m.dose ? " · " + m.dose : ""}`,
     fuTitle: "Dawka nieoznaczona", fuBody: (m) => `${m.name} — czy naprawdę wziąłeś?`,
     channel: "Przypomnienia o lekach", label: "Przypomnienia",
+    bkTitle: "Zrób kopię zapasową", bkBody: "Dziennik jest przechowywany tylko na tym telefonie.", bkChannel: "Przypomnienia o kopiach",
     diag: "Zaplanowane przypomnienia", diagRun: "Sprawdź", diagNone: "brak",
     desc: "Codzienne powiadomienia według pór przyjmowania.",
     on: "Wł.", off: "Wył.",
@@ -380,12 +507,13 @@ const relLabel = (dateStr, t) => {
 };
 
 const FEEDBACK_TO = "jormor16@valdorfas.org";
-const APP_VERSION = "0.9";
-const DEFAULT_DATA = { meds: [], doseLog: {}, seizures: [], daily: {}, notes: [], events: [], calm: [], auraTypes: [], settings: { name: "", overdueMin: 60, lang: "lt", notify: true } };
+const APP_VERSION = "1.2";
+const DEFAULT_DATA = { meds: [], doseLog: {}, seizures: [], daily: {}, notes: [], events: [], calm: [], auraTypes: [], auraEvents: [], settings: { name: "", overdueMin: 60, lang: "lt", notify: true, backupRemind: true, opens: 0, fbCard: "pending" } };
+const AURA_LINK_MIN = 60;   // per kiek laiko po auros priepuolis laikomas susijusiu
 const DAILY_EMPTY = { sleep: null, stress: null, fatigue: null, alcohol: null, note: "" };
 const TYPE_IDS = ["tonicClonic", "absence", "focal", "myoclonic", "other"];
 const EFFECT_IDS = ["fall", "injury", "tongue", "incontinence"];
-const TRIGGER_IDS = ["insomnia", "stress", "fatigue", "alcohol", "missedMeds", "missedMeal", "flashing", "illness", "unknown"];
+const TRIGGER_IDS = ["insomnia", "missedMeds", "alcohol"];   // vertimų žodyne lieka ir seni – dėl senų įrašų
 const CAT_IDS = ["doctor", "surgery", "family", "other"];
 const CAT_COLOR = { doctor: [C.blue, C.blueSoft], surgery: [C.plum, C.plumSoft], family: [C.sage, C.sageSoft], other: [C.sub, "#EBE9E0"] };
 const DURATIONS = ["<1 min", "1–2 min", "2–5 min", ">5 min"];
@@ -507,7 +635,7 @@ const inputStyle = { width: "100%", padding: "11px 14px", borderRadius: 10, bord
  * Tuščioje būsenoje rodomas PAVYZDYS, aiškiai pažymėtas: neturi atrodyti kaip
  * tikri duomenys, bet turi parodyti, kas čia bus.
  */
-function SummaryStrip({ data, t, onOpen }) {
+function SummaryStrip({ data, t, onOpen, onGuide }) {
   const hasData = data.meds.length || data.seizures.length || Object.keys(data.daily).length;
   const r = useMemo(() => (hasData ? buildReport(data, 30, t) : null), [data, t, hasData]);
 
@@ -547,6 +675,10 @@ function SummaryStrip({ data, t, onOpen }) {
         <>
           <div style={{ fontSize: 12, color: C.amber, fontWeight: 600, marginTop: 10 }}>{t.sumDemo}</div>
           <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.5, marginTop: 6 }}>{t.sumWhy}</div>
+          <button className="press" onClick={onGuide}
+            style={{ fontSize: 13, fontWeight: 600, color: C.clay, marginTop: 10, padding: "2px 0" }}>
+            {t.guide} →
+          </button>
         </>
       )}
     </Card>
@@ -627,7 +759,7 @@ function DoseRow({ time, takenAt, overdue, onToggle, t }) {
   );
 }
 
-function MedsView({ data, update, t, lc, onReport }) {
+function MedsView({ data, update, t, lc, onReport, timer, onStartTimer, onEndTimer, onDiscardTimer, onAura, auraMsg, fbCard, onGuide }) {
   const [editing, setEditing] = useState(undefined);
   const tk = todayKey();
   const log = data.doseLog[tk] || {};
@@ -657,7 +789,23 @@ function MedsView({ data, update, t, lc, onReport }) {
 
   return (
     <div>
-      <SummaryStrip data={data} t={t} onOpen={onReport} />
+      {timer ? (
+        <SeizureTimer timer={timer} t={t} onEnd={() => onEndTimer()} onDiscard={onDiscardTimer}
+          onConfirmStale={() => onEndTimer()} />
+      ) : (
+        <>
+          <PrimaryBtn color={C.plum} onClick={onStartTimer} style={{ marginTop: 14, padding: "16px 16px", fontSize: 16 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Zap size={19} /> {t.seizStart}</span>
+          </PrimaryBtn>
+          <button className="press" onClick={onAura} style={{
+            width: "100%", marginTop: 8, padding: "12px 16px", borderRadius: 12,
+            border: `1px solid ${C.plum}`, background: C.card, color: C.plum, fontSize: 14.5, fontWeight: 600,
+          }}>{t.auraFeel}</button>
+          {auraMsg && <div style={{ fontSize: 13, color: C.plum, fontWeight: 600, marginTop: 8, textAlign: "center" }}>{t.auraLogged}</div>}
+        </>
+      )}
+      {fbCard}
+      <SummaryStrip data={data} t={t} onOpen={onReport} onGuide={onGuide} />
       <SectionLabel>{t.todayIs} · {fLong(now, lc)}</SectionLabel>
       {data.meds.length === 0 && (
         <Card style={{ textAlign: "center", padding: 28 }}>
@@ -752,12 +900,13 @@ function MedsView({ data, update, t, lc, onReport }) {
 }
 
 // ---------- seizures ----------
-function SeizureForm({ initial, onSave, onClose, t, auraTypes = [], onAddAuraType }) {
-  const [at, setAt] = useState(toLocalInput(initial ? new Date(initial.at) : new Date()));
+function SeizureForm({ initial, measured, recentAura, onSave, onClose, t, auraTypes = [], onAddAuraType }) {
+  const [at, setAt] = useState(toLocalInput(initial ? new Date(initial.at) : measured ? new Date(measured.startedAt) : new Date()));
   const [type, setType] = useState(initial?.type && initial.type !== "unspec" ? initial.type : null);
-  const [dur, setDur] = useState(initial?.dur ?? null);
-  const [aura, setAura] = useState(initial ? (initial.aura ?? null) : null);
+  const [dur, setDur] = useState(initial?.dur ?? (measured ? bucketOf(measured.durSec) : null));
+  const [aura, setAura] = useState(initial ? (initial.aura ?? null) : recentAura ? true : null);
   const [trigs, setTrigs] = useState(initial?.triggers ?? []);
+  const [trigOther, setTrigOther] = useState(initial?.triggerOther ?? "");
   const [effects, setEffects] = useState(initial?.effects ?? []);
   const [note, setNote] = useState(initial?.note ?? "");
   const [kinds, setKinds] = useState(initial?.auraKinds ?? []);
@@ -772,9 +921,18 @@ function SeizureForm({ initial, onSave, onClose, t, auraTypes = [], onAddAuraTyp
           {TYPE_IDS.map((id) => <Chip key={id} active={type === id} onClick={() => setType(id)} color={C.plum} soft={C.plumSoft}>{t.ty[id]}</Chip>)}
         </div>
         <SectionLabel style={{ margin: "6px 4px 0" }}>{t.duration}</SectionLabel>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {DURATIONS.map((x) => <Chip key={x} active={dur === x} onClick={() => setDur(x)} color={C.plum} soft={C.plumSoft}>{x}</Chip>)}
-        </div>
+        {measured ? (
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "10px 14px", borderRadius: 10, background: C.plumSoft, border: `1px solid ${C.plum}` }}>
+            <span style={{ fontFamily: T.serif, fontSize: 24, fontWeight: 700, color: C.plum, fontVariantNumeric: "tabular-nums" }}>
+              {fmtDuration(measured.durSec)}
+            </span>
+            <span style={{ fontSize: 12.5, color: C.sub }}>{t.measured}</span>
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {DURATIONS.map((x) => <Chip key={x} active={dur === x} onClick={() => setDur(x)} color={C.plum} soft={C.plumSoft}>{x}</Chip>)}
+          </div>
+        )}
         {dur === ">5 min" && (
           <div style={{ background: C.amberSoft, border: `1px solid ${C.amber}`, borderRadius: 10, padding: "10px 12px", fontSize: 14, lineHeight: 1.5 }}>{t.statusWarn}</div>
         )}
@@ -783,6 +941,11 @@ function SeizureForm({ initial, onSave, onClose, t, auraTypes = [], onAddAuraTyp
           <Segmented ariaLabel={t.aura} value={aura} onChange={setAura}
             options={[{ v: true, label: t.yes }, { v: false, label: t.no }]} />
         </div>
+        {!initial && recentAura && (
+          <div style={{ fontSize: 12.5, color: C.plum, fontWeight: 600 }}>
+            {t.auraLinked.replace("{n}", Math.max(1, Math.round((Date.now() - recentAura.at) / 60000)))}
+          </div>
+        )}
         {aura === true && (
           <>
             <SectionLabel style={{ margin: "6px 4px 0" }}>{t.auraKinds}</SectionLabel>
@@ -820,10 +983,11 @@ function SeizureForm({ initial, onSave, onClose, t, auraTypes = [], onAddAuraTyp
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {TRIGGER_IDS.map((id) => <Chip key={id} active={trigs.includes(id)} onClick={() => tog(trigs, setTrigs)(id)} color={C.sage} soft={C.sageSoft}>{t.tg[id]}</Chip>)}
         </div>
+        <input style={inputStyle} placeholder={t.trigOtherPh} value={trigOther} onChange={(e) => setTrigOther(e.target.value)} />
         <textarea style={{ ...inputStyle, minHeight: 70, resize: "vertical" }} placeholder={t.seizNote} value={note} onChange={(e) => setNote(e.target.value)} />
         <PrimaryBtn color={C.plum} onClick={() => {
           const when = new Date(at), now = new Date();
-          onSave({ ...(initial || {}), id: initial?.id || uid(), at: (when > now ? now : when).toISOString(), type: type || "unspec", dur, aura, auraKinds: aura === true ? kinds : [], effects, triggers: trigs, note: note.trim() });
+          onSave({ ...(initial || {}), id: initial?.id || uid(), durSec: measured?.durSec ?? initial?.durSec, auraEventId: initial?.auraEventId ?? recentAura?.id, at: (when > now ? now : when).toISOString(), type: type || "unspec", dur, aura, auraKinds: aura === true ? kinds : [], effects, triggers: trigs, triggerOther: trigOther.trim() || undefined, note: note.trim() });
         }}>
           {t.saveEntry}
         </PrimaryBtn>
@@ -832,9 +996,10 @@ function SeizureForm({ initial, onSave, onClose, t, auraTypes = [], onAddAuraTyp
   );
 }
 
-function SeizuresView({ data, update, t, lc, onReport, quickLog }) {
+function SeizuresView({ data, update, t, lc, onReport, quickLog, measured, onMeasuredUsed, timer, onStartTimer, onEndTimer, onDiscardTimer, recentAura, onSaved, onAura }) {
   const [editing, setEditing] = useState(undefined);
-  useEffect(() => { if (quickLog) setEditing(null); }, [quickLog]); // undefined=uždaryta, null=naujas, objektas=redaguojamas
+  useEffect(() => { if (quickLog) setEditing(null); }, [quickLog]);
+  useEffect(() => { if (measured) setEditing(null); }, [measured]); // undefined=uždaryta, null=naujas, objektas=redaguojamas
   const list = [...data.seizures].sort((a, b) => new Date(b.at) - new Date(a.at));
   const now = new Date();
   const last30 = list.filter((s) => now - new Date(s.at) < 30 * 86400000).length;
@@ -842,9 +1007,20 @@ function SeizuresView({ data, update, t, lc, onReport, quickLog }) {
 
   return (
     <div>
-      <PrimaryBtn color={C.plum} onClick={() => setEditing(null)} style={{ marginTop: 14 }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Zap size={17} /> {t.regSeiz}</span>
-      </PrimaryBtn>
+      {timer ? (
+        <SeizureTimer timer={timer} t={t} onEnd={() => onEndTimer()} onDiscard={onDiscardTimer}
+          onConfirmStale={() => onEndTimer()} />
+      ) : (
+        <>
+          <PrimaryBtn color={C.plum} onClick={onStartTimer} style={{ marginTop: 14, padding: "16px 16px", fontSize: 16 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Zap size={19} /> {t.seizStart}</span>
+          </PrimaryBtn>
+          <button className="press" onClick={() => setEditing(null)}
+            style={{ width: "100%", padding: 10, marginTop: 8, fontSize: 14, fontWeight: 600, color: C.sub }}>
+            {t.regSeiz}
+          </button>
+        </>
+      )}
 
       <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
         <Card style={{ flex: 1, padding: 12, textAlign: "center" }}>
@@ -877,7 +1053,7 @@ function SeizuresView({ data, update, t, lc, onReport, quickLog }) {
               </div>
             </div>
             <div style={{ fontSize: 14, marginTop: 2 }}>
-              {lbl(t.ty, s.type)}{s.dur ? ` · ${s.dur}` : ""}{s.aura ? ` · ${t.withAura}` : ""}
+              {lbl(t.ty, s.type)}{s.durSec != null ? ` · ${fmtDuration(s.durSec)}` : s.dur ? ` · ${s.dur}` : ""}{s.aura ? ` · ${t.withAura}` : ""}
             </div>
             {s.auraKinds?.length > 0 && (
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
@@ -895,6 +1071,7 @@ function SeizuresView({ data, update, t, lc, onReport, quickLog }) {
             {s.triggers?.length > 0 && (
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
                 {s.triggers.map((x) => <span key={x} style={{ fontSize: 12, padding: "3px 9px", borderRadius: 999, background: C.sageSoft, color: C.sage, fontWeight: 500 }}>{lbl(t.tg, x)}</span>)}
+                {s.triggerOther && <span style={{ fontSize: 12, padding: "3px 9px", borderRadius: 999, background: C.sageSoft, color: C.sage, fontWeight: 500 }}>{s.triggerOther}</span>}
               </div>
             )}
             {s.note && <div style={{ fontSize: 13, color: C.sub, marginTop: 8 }}>{s.note}</div>}
@@ -903,7 +1080,7 @@ function SeizuresView({ data, update, t, lc, onReport, quickLog }) {
       </div>
 
       {editing !== undefined && (
-        <SeizureForm t={t} initial={editing} auraTypes={data.auraTypes || []}
+        <SeizureForm t={t} initial={editing} measured={editing ? null : measured} recentAura={editing ? null : recentAura} auraTypes={data.auraTypes || []}
           onAddAuraType={(label) => {
             const exist = (data.auraTypes || []).find((a) => a.label.toLowerCase() === label.toLowerCase());
             if (exist) return exist.id;
@@ -911,13 +1088,13 @@ function SeizuresView({ data, update, t, lc, onReport, quickLog }) {
             update((d) => { d.auraTypes = [...(d.auraTypes || []), { id, label }]; return d; });
             return id;
           }}
-          onClose={() => setEditing(undefined)} onSave={(e) => {
+          onClose={() => { setEditing(undefined); onMeasuredUsed(); }} onSave={(e) => {
           update((d) => {
             const i = d.seizures.findIndex((x) => x.id === e.id);
             if (i >= 0) d.seizures[i] = e; else d.seizures.push(e);
             return d;
           });
-          setEditing(undefined);
+          setEditing(undefined); onMeasuredUsed(); onSaved && onSaved();
         }} />
       )}
     </div>
@@ -1338,7 +1515,7 @@ function buildReport(data, days, t) {
 
   const seiz = data.seizures.filter((s) => new Date(s.at) >= since);
   const types = cnt(seiz.map((s) => lbl(t.ty, s.type)));
-  const trigs = cnt(seiz.flatMap((s) => (s.triggers || []).map((x) => lbl(t.tg, x))));
+  const trigs = cnt(seiz.flatMap((s) => [...(s.triggers || []).map((x) => lbl(t.tg, x)), ...(s.triggerOther ? [s.triggerOther] : [])]));
   const effs = cnt(seiz.flatMap((s) => (s.effects || []).map((x) => lbl(t.ef, x))));
   const auraLabel = (id) => ((data.auraTypes || []).find((a) => a.id === id)?.label) || id;
   const auraKinds = cnt(seiz.flatMap((s) => (s.auraKinds || []).map(auraLabel)));
@@ -1442,6 +1619,197 @@ function ReportSheet({ data, onClose, t }) {
   );
 }
 
+/**
+ * Vienkartinis paprašymas parašyti. Kortelė, ne modalas — nestabdo darbo.
+ * Nerodoma iškart po priepuolio ar auros įrašo: tokiu momentu žmogui ne iki to.
+ */
+function FeedbackCard({ t, onWrite, onDismiss }) {
+  return (
+    <Card style={{ marginTop: 14, borderLeft: `4px solid ${C.clay}` }}>
+      <div style={{ fontSize: 14, lineHeight: 1.6, color: C.ink }}>{t.fbCardText}</div>
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <PrimaryBtn onClick={onWrite}>{t.fbCardYes}</PrimaryBtn>
+        <button className="press" onClick={onDismiss}
+          style={{ padding: "13px 18px", borderRadius: 12, fontSize: 15, fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>
+          {t.fbCardNo}
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+// ---------- seizure timer ----------
+/**
+ * Trukmė matuojama, o ne įvedama ranka. Praėjęs laikas visada skaičiuojamas iš
+ * sieninio laikrodžio, todėl programėlės užvėrimas ar nužudymas jo nesugadina.
+ */
+function SeizureTimer({ timer, t, onEnd, onDiscard, onConfirmStale }) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => tick((x) => x + 1), 500);
+    return () => clearInterval(iv);
+  }, []);
+
+  const sec = elapsedSec(timer.startedAt);
+  const stale = isStale(timer.startedAt);
+  const alert = !stale && sec >= ALERT_SEC;
+
+  // Laikmatis, veikiantis daugiau nei valandą, beveik visada reiškia pamirštą sustabdymą.
+  // Rodyti tokį skaičių kaip faktą būtų klaidinga — klausiam.
+  if (stale) {
+    return (
+      <Card style={{ marginTop: 14, borderLeft: `4px solid ${C.amber}`, background: C.amberSoft }}>
+        <div style={{ fontFamily: T.serif, fontSize: 17, fontWeight: 600 }}>{t.seizStale}</div>
+        <div style={{ fontSize: 13, color: C.ink, marginTop: 6, lineHeight: 1.5 }}>{t.seizStaleNote}</div>
+        <div style={{ fontSize: 12.5, color: C.sub, marginTop: 6 }}>
+          {t.startedAt}: {new Date(timer.startedAt).toLocaleString()}
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <PrimaryBtn color={C.plum} onClick={onConfirmStale}>{t.seizStaleYes}</PrimaryBtn>
+          <PrimaryBtn color={C.sub} onClick={onDiscard}>{t.seizStaleDiscard}</PrimaryBtn>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card style={{
+      marginTop: 14, textAlign: "center",
+      borderColor: alert ? C.red : C.plum, borderWidth: alert ? 2 : 1,
+      background: alert ? C.redSoft : C.card,
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: alert ? C.red : C.plum, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+        {t.seizRunning}
+      </div>
+      <div style={{ fontFamily: T.serif, fontSize: 54, fontWeight: 700, lineHeight: 1.1, marginTop: 4, fontVariantNumeric: "tabular-nums", color: alert ? C.red : C.ink }}>
+        {fmtDuration(sec)}
+      </div>
+      {alert && (
+        <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 10, background: C.red, color: "#FFF" }}>
+          <div style={{ fontSize: 14.5, fontWeight: 700, lineHeight: 1.4 }}>{t.seizAlert}</div>
+          <div style={{ fontSize: 12, opacity: 0.85, marginTop: 4 }}>{t.seizAlertNote}</div>
+        </div>
+      )}
+      <PrimaryBtn color={alert ? C.red : C.plum} onClick={onEnd} style={{ marginTop: 12 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Square size={16} /> {t.seizEnd}</span>
+      </PrimaryBtn>
+    </Card>
+  );
+}
+
+// ---------- guide ----------
+/**
+ * Skyriai suskleisti: telefone ilgas tekstas neskaitomas, o žmogui paprastai rūpi
+ * vienas konkretus dalykas. Pirmasis atidarytas, kad būtų aišku, jog jie atsidaro.
+ */
+function GuideSheet({ t, onClose }) {
+  const [open, setOpen] = useState(0);
+  const sections = [
+    [t.gSeiz, t.gSeizB], [t.gAura, t.gAuraB], [t.gMeds, t.gMedsB],
+    [t.gReport, t.gReportB], [t.gBackup, t.gBackupB], [t.gPrivacy, t.gPrivacyB],
+  ];
+  return (
+    <Sheet title={t.guide} onClose={onClose} t={t}>
+      <div style={{ fontSize: 13, color: C.sub, marginBottom: 12, lineHeight: 1.5 }}>{t.guideIntro}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {sections.map(([title, body], i) => {
+          const on = open === i;
+          return (
+            <div key={i} style={{ background: C.card, border: `1px solid ${on ? C.clay : C.line}`, borderRadius: 12, overflow: "hidden" }}>
+              <button className="press" onClick={() => setOpen(on ? -1 : i)} aria-expanded={on}
+                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                         gap: 10, padding: "13px 14px", textAlign: "left" }}>
+                <span style={{ fontFamily: T.serif, fontSize: 15.5, fontWeight: 600, color: on ? C.clayDark : C.ink }}>{title}</span>
+                <ChevronRight size={18} style={{ color: C.sub, flexShrink: 0, transform: on ? "rotate(90deg)" : "none", transition: "transform 140ms ease" }} />
+              </button>
+              {on && (
+                <div style={{ padding: "0 14px 14px", fontSize: 13.5, lineHeight: 1.65, color: C.ink }}>{body}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.55, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.line}` }}>
+        {t.gDisc}
+      </div>
+    </Sheet>
+  );
+}
+
+// ---------- backup ----------
+function BackupSheet({ t, onClose, onRestored }) {
+  const [state, setState] = useState("idle");   // idle | checking | found | done | error
+  const [info, setInfo] = useState(null);
+  const [err, setErr] = useState(null);
+  const [msg, setMsg] = useState("");
+
+  const errText = { parse: t.bkErrParse, shape: t.bkErrShape, newer: t.bkErrNewer, empty: t.bkErrEmpty };
+
+  const pick = () => {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "application/json,.json";
+    inp.onchange = () => {
+      const f = inp.files && inp.files[0];
+      if (!f) return;
+      setState("checking"); setErr(null);
+      const rd = new FileReader();
+      rd.onload = () => {
+        const v = validateBackup(String(rd.result));
+        if (!v.ok) { setErr(v.code); setState("error"); return; }
+        setInfo(v); setState("found");
+      };
+      rd.onerror = () => { setErr("parse"); setState("error"); };
+      rd.readAsText(f);
+    };
+    inp.click();
+  };
+
+  return (
+    <Sheet title={t.backup} onClose={onClose} t={t}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <PrimaryBtn onClick={async () => {
+          try { const r = await exportBackup(); setMsg(r.ok ? `${t.bkDone} · ${r.name}` : t.bkFail); }
+          catch (e) { setMsg(t.bkFail); }
+        }}>{t.bkMake}</PrimaryBtn>
+        {msg && <div style={{ fontSize: 13, color: C.sage, fontWeight: 600, wordBreak: "break-all" }}>{msg}</div>}
+        <div style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.5 }}>{t.bkHint}</div>
+
+        <div style={{ height: 1, background: C.line, margin: "6px 0" }} />
+
+        {state === "done" ? (
+          <div style={{ fontSize: 14, fontWeight: 600, color: C.sage }}>{t.bkOk}</div>
+        ) : state === "found" ? (
+          <>
+            <div style={{ fontFamily: T.serif, fontSize: 16, fontWeight: 600 }}>{t.bkFound}</div>
+            {info.exportedAt && (
+              <div style={{ fontSize: 12.5, color: C.sub }}>{t.bkFrom}: {new Date(info.exportedAt).toLocaleString()}</div>
+            )}
+            <div style={{ fontSize: 13 }}>
+              {t.bkWill}: {info.counts.seizures} {t.tSeiz.toLowerCase()} · {info.counts.meds} {t.tMeds.toLowerCase()} · {info.counts.notes} {t.tNotes.toLowerCase()}
+            </div>
+            <div style={{ background: C.amberSoft, border: `1px solid ${C.amber}`, borderRadius: 10, padding: "10px 12px", fontSize: 13, lineHeight: 1.5 }}>
+              {t.bkWarn}
+            </div>
+            <PrimaryBtn color={C.red} onClick={async () => {
+              try { await restoreBackup(info.payload); setState("done"); onRestored(); }
+              catch (e) { setErr("shape"); setState("error"); }
+            }}>{t.bkConfirm}</PrimaryBtn>
+          </>
+        ) : (
+          <>
+            <PrimaryBtn color={C.ink} onClick={pick}>
+              {state === "checking" ? t.bkChecking : t.bkRestore}
+            </PrimaryBtn>
+            {state === "error" && (
+              <div style={{ fontSize: 13, color: C.red, fontWeight: 600, lineHeight: 1.5 }}>{errText[err] || t.bkErrShape}</div>
+            )}
+          </>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
 // ---------- feedback ----------
 function FeedbackSheet({ data, t, onClose }) {
   const [kind, setKind] = useState("bug");
@@ -1494,9 +1862,9 @@ function FeedbackSheet({ data, t, onClose }) {
 }
 
 // ---------- settings ----------
-function SettingsSheet({ data, update, onReset, onClose, onFeedback, t }) {
-  const s = { name: "", overdueMin: 60, lang: "lt", notify: true, ...(data.settings || {}) };
-  const setS = (k, v) => update((d) => { d.settings = { name: "", overdueMin: 60, lang: "lt", notify: true, ...(d.settings || {}), [k]: v }; return d; });
+function SettingsSheet({ data, update, onReset, onClose, onFeedback, onBackup, onGuide, t }) {
+  const s = { name: "", overdueMin: 60, lang: "lt", notify: true, backupRemind: true, ...(data.settings || {}) };
+  const setS = (k, v) => update((d) => { d.settings = { name: "", overdueMin: 60, lang: "lt", notify: true, backupRemind: true, ...(d.settings || {}), [k]: v }; return d; });
   const [copied, setCopied] = useState(false);
   const [armed, setArmed] = useState(false);
   const [perm, setPerm] = useState("prompt");
@@ -1521,7 +1889,9 @@ function SettingsSheet({ data, update, onReset, onClose, onFeedback, t }) {
   };
   return (
     <Sheet title={t.settings} onClose={onClose} t={t}>
-      <SectionLabel style={{ margin: "0 4px 8px" }}>{t.language}</SectionLabel>
+      <PrimaryBtn color={C.ink} onClick={onGuide}>{t.guide}</PrimaryBtn>
+
+      <SectionLabel>{t.language}</SectionLabel>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {LANGS.map((l) => <Chip key={l.id} active={s.lang === l.id} onClick={() => setS("lang", l.id)}>{l.name}</Chip>)}
       </div>
@@ -1564,6 +1934,14 @@ function SettingsSheet({ data, update, onReset, onClose, onFeedback, t }) {
         )}
       </div>
 
+      <SectionLabel>{t.backup}</SectionLabel>
+      <PrimaryBtn onClick={onBackup}>{t.backup}</PrimaryBtn>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, gap: 10 }}>
+        <div style={{ fontSize: 14 }}>{t.bkRemind}</div>
+        <Segmented ariaLabel={t.bkRemind} value={s.backupRemind !== false} onChange={(v) => setS("backupRemind", v)}
+          color={C.sage} soft={C.sageSoft} options={[{ v: true, label: t.n.on }, { v: false, label: t.n.off }]} />
+      </div>
+
       <SectionLabel>{t.fbLabel}</SectionLabel>
       <PrimaryBtn color={C.ink} onClick={onFeedback}>{t.fbBtn}</PrimaryBtn>
 
@@ -1574,21 +1952,11 @@ function SettingsSheet({ data, update, onReset, onClose, onFeedback, t }) {
 }
 
 // ---------- wellbeing ----------
-function WellbeingView({ data, update, t, lc }) {
-  const [seg, setSeg] = useState("state");
+function BreatheSheet({ data, update, t, onClose }) {
   return (
-    <div>
-      <div style={{ display: "flex", gap: 4, background: C.card, border: `1px solid ${C.line}`, borderRadius: 999, padding: 4, marginTop: 16 }}>
-        {[["state", t.segState], ["calm", t.segCalm]].map(([k, l]) => (
-          <button key={k} className="press" onClick={() => setSeg(k)} style={{
-            flex: 1, padding: "8px 0", borderRadius: 999, fontSize: 14, fontWeight: 600,
-            background: seg === k ? C.claySoft : "transparent", color: seg === k ? C.clayDark : C.sub, transition: "all 120ms ease",
-          }}>{l}</button>
-        ))}
-      </div>
-      <div style={{ display: seg === "state" ? "block" : "none" }}><StateView data={data} update={update} t={t} lc={lc} /></div>
-      <div style={{ display: seg === "calm" ? "block" : "none" }}><CalmView data={data} update={update} t={t} /></div>
-    </div>
+    <Sheet title={t.breathe} onClose={onClose} t={t}>
+      <CalmView data={data} update={update} t={t} />
+    </Sheet>
   );
 }
 
@@ -1597,7 +1965,7 @@ const TABS = [
   { id: "meds", key: "tMeds", icon: Pill },
   { id: "seizures", key: "tSeiz", icon: Zap },
   { id: "calendar", key: "tCal", icon: CalendarDays },
-  { id: "wellbeing", key: "tWell", icon: Activity },
+  { id: "state", key: "segState", icon: Activity },
   { id: "notes", key: "tNotes", icon: NotebookPen },
 ];
 
@@ -1609,6 +1977,19 @@ export default function App() {
   const [showReport, setShowReport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showBackup, setShowBackup] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+  const [timer, setTimer] = useState(null);        // { startedAt }
+  const [measured, setMeasured] = useState(null);  // { startedAt, durSec } -> į formą
+  const [showBreathe, setShowBreathe] = useState(false);
+  const [auraMsg, setAuraMsg] = useState(false);
+  // Sesijos žyma: ar šiame paleidime jau buvo įrašytas priepuolis/aura.
+  // Jei taip – atsiliepimo kortelė laukia kito paleidimo.
+  const savedThisSession = useRef(false);
+
+  // veikiantis laikmatis atkuriamas iš Preferences, ne iš atminties:
+  // programėlė galėjo būti nužudyta priepuolio metu
+  useEffect(() => { loadTimer().then(setTimer); }, []);
   const [quickLog, setQuickLog] = useState(0);
 
   useEffect(() => {
@@ -1679,7 +2060,7 @@ export default function App() {
 
   // grįžus iš fono perpiešiam — kitaip po vidurnakčio rodytų vakarykštę dieną
   const [dayTick, bumpDay] = useState(0);
-  useEffect(() => onResume(() => bumpDay((x) => x + 1)), []);
+  useEffect(() => onResume(() => { bumpDay((x) => x + 1); loadTimer().then(setTimer); }), []);
 
   const lang = data.settings?.lang || "lt";
   const t = useMemo(() => ({ ...(STR[lang] || STR.lt), n: NOTIF[lang] || NOTIF.lt }), [lang]);
@@ -1694,7 +2075,66 @@ export default function App() {
     initChannel(t).then(() => syncMedReminders(data.meds, data.doseLog, t, notify));
   }, [loaded, medSig, lang, notify, dayTick]);
 
-  const View = { meds: MedsView, seizures: SeizuresView, calendar: CalendarView, wellbeing: WellbeingView, notes: NotesView }[tab];
+  // 4.1: skaičiuojam paleidimus – po vieną kartą kiekvienam
+  const counted = useRef(false);
+  useEffect(() => {
+    if (!loaded || counted.current) return;
+    counted.current = true;
+    update((d) => { d.settings = { ...d.settings, opens: (d.settings?.opens || 0) + 1 }; return d; });
+  }, [loaded]);
+
+  const entries = data.seizures.length + (data.auraEvents || []).length + data.notes.length;
+  const showFbCard = loaded
+    && data.settings?.fbCard === "pending"
+    && (data.settings?.opens || 0) >= 3
+    && entries >= 1
+    && !savedThisSession.current;      // 4.2: ne iškart po įrašo
+
+  const closeFbCard = () => update((d) => { d.settings = { ...d.settings, fbCard: "done" }; return d; });
+  const fbCard = showFbCard ? (
+    <FeedbackCard t={t} onDismiss={closeFbCard}
+      onWrite={() => { closeFbCard(); setShowFeedback(true); }} />
+  ) : null;
+
+  const backupRemind = data.settings?.backupRemind !== false;
+  useEffect(() => {
+    if (!loaded) return;
+    syncBackupReminder(t, notify && backupRemind);
+  }, [loaded, lang, notify, backupRemind]);
+
+  // 3.2: aura fiksuojama su laiko žyma IR iškart atidaromas kvėpavimo pratimas
+  const logAura = () => {
+    update((d) => { d.auraEvents = [...(d.auraEvents || []), { id: uid(), at: Date.now() }]; return d; });
+    savedThisSession.current = true;
+    setAuraMsg(true);
+    setShowBreathe(true);
+    setTimeout(() => setAuraMsg(false), 4000);
+  };
+
+  // 3.3: paskutinė aura per AURA_LINK_MIN, dar nepriskirta jokiam priepuoliui
+  const recentAura = useMemo(() => {
+    const used = new Set(data.seizures.map((x) => x.auraEventId).filter(Boolean));
+    return [...(data.auraEvents || [])]
+      .filter((a) => !used.has(a.id) && Date.now() - a.at <= AURA_LINK_MIN * 60000)
+      .sort((a, b) => b.at - a.at)[0] || null;
+  }, [data.auraEvents, data.seizures]);
+
+  const beginSeizure = async () => {
+    const at = await startTimer();
+    setTimer({ startedAt: at });
+    setTab("seizures");
+  };
+
+  const endSeizure = async (endedAt = Date.now()) => {
+    if (!timer) return;
+    const durSec = elapsedSec(timer.startedAt, endedAt);
+    await clearTimer();
+    setTimer(null);
+    setMeasured({ startedAt: timer.startedAt, durSec });
+    setTab("seizures");
+  };
+
+  const View = { meds: MedsView, seizures: SeizuresView, calendar: CalendarView, state: StateView, notes: NotesView }[tab];
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.ink, fontFamily: T.body, display: "flex", justifyContent: "center" }}>
@@ -1715,7 +2155,12 @@ export default function App() {
         </header>
         {!storageOk && <div style={{ fontSize: 12, color: C.amber, fontWeight: 600, marginTop: 6 }}>{t.notSaved}</div>}
 
-        {loaded ? <View data={data} update={update} t={t} lc={lc} onReport={() => setShowReport(true)} quickLog={quickLog} /> : (
+        {loaded ? <View data={data} update={update} t={t} lc={lc} onReport={() => setShowReport(true)} quickLog={quickLog}
+            onAura={logAura} auraMsg={auraMsg} fbCard={fbCard} recentAura={recentAura} onGuide={() => setShowGuide(true)}
+            onSaved={() => { savedThisSession.current = true; }}
+            measured={measured} onMeasuredUsed={() => setMeasured(null)}
+            timer={timer} onStartTimer={beginSeizure} onEndTimer={endSeizure}
+            onDiscardTimer={async () => { await clearTimer(); setTimer(null); }} /> : (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, marginTop: 90 }}>
             <div className="breathe"><Sunburst size={44} /></div>
             <div style={{ fontSize: 13, color: C.sub }}>{t.loading}</div>
@@ -1727,7 +2172,14 @@ export default function App() {
 
       {showReport && <ReportSheet data={data} t={t} onClose={() => setShowReport(false)} />}
       {showSettings && <SettingsSheet data={data} update={update} t={t} onReset={resetAll}
-        onFeedback={() => { setShowSettings(false); setShowFeedback(true); }} onClose={() => setShowSettings(false)} />}
+        onFeedback={() => { setShowSettings(false); setShowFeedback(true); }}
+        onBackup={() => { setShowSettings(false); setShowBackup(true); }}
+        onGuide={() => { setShowSettings(false); setShowGuide(true); }}
+        onClose={() => setShowSettings(false)} />}
+      {showGuide && <GuideSheet t={t} onClose={() => setShowGuide(false)} />}
+      {showBreathe && <BreatheSheet data={data} update={update} t={t} onClose={() => setShowBreathe(false)} />}
+      {showBackup && <BackupSheet t={t} onClose={() => setShowBackup(false)}
+        onRestored={async () => { const p = await loadData(); if (p) setData({ ...DEFAULT_DATA, ...p, settings: { ...DEFAULT_DATA.settings, ...(p.settings || {}) } }); }} />}
       {showFeedback && <FeedbackSheet data={data} t={t} onClose={() => setShowFeedback(false)} />}
 
       <div style={{
@@ -1735,14 +2187,14 @@ export default function App() {
         transform: "translateX(-50%)", width: "100%", maxWidth: 480, zIndex: 20,
         display: "flex", justifyContent: "flex-end", pointerEvents: "none",
       }}>
-        <button className="press" aria-label={t.quickLog}
-          onClick={() => { setTab("seizures"); setQuickLog((x) => x + 1); }}
+        <button className="press" aria-label={timer ? t.seizEnd : t.seizStart}
+          onClick={() => (timer ? endSeizure() : beginSeizure())}
           style={{
             pointerEvents: "auto", marginRight: 16, width: 56, height: 56, borderRadius: "50%",
-            background: C.plum, color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center",
+            background: timer ? C.red : C.plum, color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center",
             boxShadow: "0 4px 14px rgba(61,57,41,0.22)", transition: "transform 80ms ease",
           }}>
-          <Zap size={25} strokeWidth={2.3} />
+          {timer ? <Square size={22} strokeWidth={2.6} /> : <Zap size={25} strokeWidth={2.3} />}
         </button>
       </div>
 
