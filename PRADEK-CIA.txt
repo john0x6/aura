@@ -1,0 +1,69 @@
+AURA — kaip gauti APK
+=====================
+
+Šio archyvo turinys yra PROJEKTO ŠAKNIS. Išpakavus turi matyti:
+
+    index.html          <-- privalo būti čia, viename lygyje su package.json
+    package.json
+    vite.config.js
+    capacitor.config.json
+    src\
+    assets\
+    .github\
+
+Jei matai dar vieną katalogą, kurio viduje yra šie failai — įėjai vienu lygiu
+per aukštai. Visos komandos leidžiamos ten, kur yra package.json.
+
+
+KELIAS A — be nieko diegimo (rekomenduojama)
+--------------------------------------------
+1. github.com/new -> sukurk repo (gali būti privatus).
+2. Repo -> Add file -> Upload files.
+3. Įtrauk į naršyklę VISĄ šio archyvo turinį (index.html, package.json, src, assets,
+   .github ...) — ne katalogą, o jo vidų. GitHub išsaugos podkatalogus.
+4. Commit changes.
+5. Patikrink: repo pirmame lygyje turi matytis index.html ir package.json.
+   Jei matai vieną katalogą — įkėlei per aukštai, CI nulūš.
+6. Actions -> Build APK -> Run workflow.
+7. Po ~5 min atsidaryk užbaigtą runą -> apačioje Artifacts -> aura-debug-apk.
+8. Atsisiųsk ZIP, ištrauk app-debug.apk, permesk į telefoną, atidaryk failą.
+   Android paprašys leisti diegti iš nežinomų šaltinių -> leidi -> Install.
+
+Leidimai (pranešimai, tikslūs žadintuvai) ir pranešimų piktograma CI'e įrašomi
+automatiškai, todėl priminimai šiame APK veiks. README 1-2 skyriai reikalingi tik
+tada, jei buildini lokaliai (Kelias B).
+
+
+KELIAS B — lokaliai (Windows)
+-----------------------------
+Reikia: Node.js 20+, Android Studio (jis pats parsisiunčia Android SDK), JDK 21.
+
+    cd <katalogas su package.json>
+    npm install
+    npm run dev          -> turi atsidaryti http://localhost:5173
+
+Jei "Could not resolve entry module index.html" — vadinasi esi ne tame kataloge
+arba index.html realiai vadinasi index.html.txt (Explorer slepia prievardžius:
+View -> File name extensions).
+
+Kai localhost veikia:
+
+    npx cap add android
+    npm run android      -> build + sync + atidaro Android Studio
+
+Android Studio: Build -> Build APK(s).
+Rezultatas: android\app\build\outputs\apk\debug\app-debug.apk
+
+Prijungus telefoną USB laidu (Developer options -> USB debugging):
+
+    npx cap run android
+
+
+PASTABOS
+--------
+- Debug APK tinka tik testavimui. Play Store priima tik pasirašytą AAB.
+- Vaistų priminimai veikia TIK įdiegtoje programėlėje, ne naršyklėje.
+- aura-standalone.html yra atskiras vienas failas telefono naršyklei
+  (Add to Home Screen). Priminimų jame nebus, visa kita veiks.
+- Prieš buildinant perskaityk README.md — ten Android leidimai ir Play Console
+  reikalavimai.

@@ -68,8 +68,39 @@ duomenys jau nuskaityti. Kitaip vartotojas akimirką pamatytų tuščią sąraš
 - **`src/storage.js`** — `@capacitor/preferences`. Tinka iki ~1 MB duomenų; tai maždaug 10+ metų
   dienyno. Peraugus — migruoti į `@capacitor-community/sqlite`, duomenų modelis (vienas JSON)
   tam paruoštas.
-- **`src/notifications.js`** — priminimai perplanuojami kaskart pasikeitus vaistų sąrašui, kalbai
-  ar jungikliui. Seni atšaukiami prieš planuojant naujus, todėl dublikatų nesikaupia.
+- **`src/notifications.js`** — planuojami **tikslūs `at` laiko taškai 14 d. į priekį**, ne
+  pakartojami žadintuvai. `schedule.on` pakartojimus nutildo DND, riboja Doze, o po force-stop jie
+  nebeatsistato. Sąrašas papildomas kiekvieną grįžimą iš fono.
+  **Leidimas tikrinamas prieš atšaukimą** — atvirkštinė seka buvo priežastis, kodėl priminimai
+  „suveikdavo vieną kartą, o paskui nustodavo“.
+  Kiekvienai nepažymėtai dozei — **vienas** pakartojimas po 30 min (`FOLLOWUP_MIN`). Pažymėjus dozę
+  atšaukiamas būtent jos pakartojimas; eskalacijos nėra, nes begalinis kalimas baigiasi tuo, kad
+  vartotojas išjungia pranešimus visai.
+- **Laikymosi vardiklis skaičiuojamas pagal dieną** (`scheduledOn`). Vaistas turi `timesFrom` — dienos
+  iki jo į vardiklį neįtraukiamos, nes tuomet grafiko nežinom. Be to šiandien pridėtas vaistas
+  paverstų visą praėjusį mėnesį „0 %“. Vaistai be `timesFrom` (senesni duomenys) galioja visada.
+- **Šriftai bundle'inami lokaliai** (`@fontsource-variable`). Google Fonts užklausa iš sveikatos
+  programėlės reikštų kreipimąsi į trečią šalį kiekvieno paleidimo metu ir lūžtų be interneto.
+  `aura-standalone.html` šriftai įrašyti base64 — failas neatlieka **nė vienos** išorinės užklausos.
+- **Atsiliepimai** (`Nustatymai → Atsiliepimas`) atidaro `mailto:` su versija, platforma ir kalba.
+  Dienyno turinys nesiunčiamas niekada — tai sveikatos duomenys.
+- **`src/dates.js`** — `dkey()` bendras `App.jsx` ir planuokliui. Nesutapimas tyliai sugadintų
+  pakartojimų atšaukimą, todėl funkcija sąmoningai viena.
+
+### Priminimų diagnostika telefone
+
+Nustatymai → Priminimai → **Tikrinti** rodo suplanuotų pranešimų kiekį. Turi būti
+`dozės/dieną × dienų × 2`. Jei rodo **0** arba `nėra`, tvarkaraštis neegzistuoja — tai kodo ar
+leidimų problema, ne Doze. Tikrinti tokia tvarka:
+
+1. **Tikrinti** iškart atidarius programėlę → jei 0, problema planuoklyje ar leidimuose.
+2. Nustatymai → Programos → Aura → Pranešimai (leista?) ir Žadintuvai / Alarms & reminders (leista?).
+3. Nustatymai → Programos → Aura → Baterija → **Neribojama**. Testas per naktį → izoliuoja Doze.
+4. DND → Programos → leisti Aura → testas su įjungtu DND. HIGH kanalas DND **neapeina**.
+5. Pranešimas po 3 min, ekranas užgesęs, telefono neliesti. Tada tas pats per naktį.
+   „Atėjo vėliau“ vs „neatėjo niekada“ atskiria Doze nuo planuoklio.
+6. Jei įmanoma — Pixel arba stock ROM. Atskiria OEM battery managerį (Xiaomi, Huawei, Samsung)
+   nuo programėlės kodo.
 - **Įrašymas debounce'intas 700 ms** su priverstiniu flush'u minimizuojant (`visibilitychange`)
   ir uždarant (`pagehide`).
 - **Priepuolių tipai, trigeriai ir pasekmės saugomi ID, ne tekstais** — perjungus kalbą seni įrašai
