@@ -22,7 +22,7 @@ export async function initStatusBar() {
     await StatusBar.setStyle({ style: Style.Light });
     if (isAndroid()) {
       await StatusBar.setOverlaysWebView({ overlay: false });
-      await StatusBar.setBackgroundColor({ color: "#F0EEE5" });
+      await StatusBar.setBackgroundColor({ color: "#EDF1F2" });
     }
   } catch (e) { /* kai kuriuose įrenginiuose neprivaloma */ }
 }

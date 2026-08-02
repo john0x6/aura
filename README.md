@@ -90,6 +90,15 @@ duomenys jau nuskaityti. Kitaip vartotojas akimirką pamatytų tuščią sąraš
   buvo pašalintas būtent dėl to.
 - **Pašalinti trigeriai lieka vertimų žodyne.** `TRIGGER_IDS` apkarpytas iki trijų, bet `t.tg`
   saugo visus senus raktus — kitaip seni įrašai rodytų vidinius ID vietoj teksto.
+- **Paletė atitraukta nuo raudonos-oranžinės zonos.** Perėjimas į sotų raudoną laikomas rizikos
+  veiksniu net statiniame vaizde, todėl pagrindinis akcentas yra petrolinis (#1F6E6B), priepuoliai —
+  indigo, o įspėjimo raudona nuslopinta (S=34 %) ir naudojama tik kraštinei bei tekstui.
+- **5 min aliarmas nekeičia didelio ploto į raudoną.** Vietoj sotaus raudono bloko — baltas fonas,
+  raudonas kontūras, ikona ir tekstas; perėjimas 600 ms, ne staigus perjungimas.
+- **Kvėpavimo seansai neįtraukiami į ataskaitą gydytojui.** Klinikinėje ataskaitoje šalia priepuolių
+  dažnio jie implikuotų terapinę reikšmę, o to teigti negalima. Duomenys renkami toliau.
+- **Lietimo taikiniai 44 px**, nors ikonos lieka mažos: dalis vartotojų turi motorikos ir dėmesio
+  sunkumų po priepuolių bei dėl vaistų.
 - **`src/backup.js`** — eksportas nuskaito **visus** Preferences raktus (`Preferences.keys()`), ne
   vien `aura-data`, kad ateity pridėti raktai nebūtų tyliai praleisti. Failas rašomas į `Directory.Cache`
   ir atiduodamas per Android dalinimosi langą — tinklo kodo nėra jokio.

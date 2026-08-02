@@ -7,19 +7,28 @@ import { syncBackupReminder } from "./notifications";
 import { exportBackup, validateBackup, restoreBackup } from "./backup";
 import { startTimer, loadTimer, clearTimer, elapsedSec, isStale, fmtDuration, bucketOf, ALERT_SEC } from "./seizureTimer";
 import { hideSplash, initStatusBar, onBackButton, onResume, exitApp } from "./native";
-import { Pill, Zap, Activity, NotebookPen, Plus, X, Check, Trash2, Minus, Wind, CalendarDays, ChevronLeft, ChevronRight, Play, Square, FileText, Settings as Cog, Pencil, Pause } from "lucide-react";
+import { Pill, Zap, Activity, NotebookPen, Plus, X, Check, Trash2, Minus, Wind, CalendarDays, ChevronLeft, ChevronRight, Play, Square, FileText, Settings as Cog, Pencil, Pause, AlertTriangle } from "lucide-react";
 
 // ---------- design tokens: Claude-style ----------
 const C = {
-  bg: "#F0EEE5", card: "#FAF9F5", white: "#FFFFFF", ink: "#3D3929", sub: "#87867F", line: "#E3DFD3",
-  clay: "#D97757", claySoft: "#F6E4DB", clayDark: "#C05F3C",
-  blue: "#7286A8", blueSoft: "#E7EBF2",
-  sage: "#6E8F6E", sageSoft: "#E7EDE2",
-  amber: "#B0741F", amberSoft: "#F3E8D3",
-  plum: "#96637F", plumSoft: "#F0E4EB",
-  red: "#B04A4A", redSoft: "#F5E4E4",
+  // Paletė sąmoningai atitraukta nuo raudonos-oranžinės zonos: perėjimas į sotų raudoną
+  // laikomas rizikos veiksniu net statiniame vaizde, o akcentas kartojasi visame ekrane.
+  bg: "#EDF1F2", card: "#FFFFFF", white: "#FFFFFF",
+  ink: "#1B2A31",          // gilus skalūnas, ne juoda – mažesnis šviesumo skirtumas
+  sub: "#546A76", line: "#D8E1E4",
+  clay: "#1F6E6B", claySoft: "#E1EDEC", clayDark: "#175856",   // pagrindinis: petrolinis
+  blue: "#4C5A8F", blueSoft: "#E7E9F3",
+  sage: "#3F7A57", sageSoft: "#E3EDE6",
+  amber: "#8A6520", amberSoft: "#F1E9D8",
+  plum: "#4C5A8F", plumSoft: "#E7E9F3",   // priepuoliai: indigo, ne slyvinė
+  red: "#96504A", redSoft: "#F2E6E4",     // tik kraštinei ir tekstui, niekada dideliam plotui
 };
-const T = { serif: "'Source Serif 4', Georgia, serif", body: "'Inter', system-ui, sans-serif" };
+
+const T = {
+  serif: "'Literata Variable', Georgia, serif",
+  body: "'IBM Plex Sans Variable', system-ui, sans-serif",
+};
+
 const GLOBAL_CSS = `
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 body { margin: 0; }
@@ -68,13 +77,10 @@ const STR = {
     statusWarn: "Ilgesnis nei 5 min priepuolis gali būti status epilepticus — būtina skubi pagalba (112).",
     newEvent: "Naujas įrašas kalendoriuje", eventWhat: "Kas? pvz. Užeiti pas tėvus",
     timeOptional: "Laikas nebūtinas — be jo įrašas bus „visą dieną“.",
-    saveEvent: "Įrašyti į kalendorių", noEventsDay: "Šią dieną įrašų nėra.", addForDay: "Pridėti šiai dienai", upcoming: "Artimiausi",
-    breathing: "Kvėpavimas", prepare: "Pasiruošk", inhale: "Įkvėpk", hold: "Sulaikyk", exhale: "Iškvėpk",
+    saveEvent: "Įrašyti į kalendorių", noEventsDay: "Šią dieną įrašų nėra.", addForDay: "Pridėti šiai dienai", upcoming: "Artimiausi", prepare: "Pasiruošk", inhale: "Įkvėpk", hold: "Sulaikyk", exhale: "Iškvėpk",
     pBox: "Dėžutė 4·4·4·4", pRelax: "Ramybei 4·7·8", start: "Pradėti", stop: "Stabdyti",
-    remaining: (n) => `liko ${n} min`, doneMin: (n) => `Baigta — ${n} min ✓`, stoppedMin: (n) => `Sustabdyta — ${n} min įrašyta`,
-    thisMonth: "Šį mėnesį", sessions: "seansai", minTotal: "min iš viso",
-    calmHint: "Lėto kvėpavimo pratimas atsipalaidavimui.",
-    segState: "Būsena", segCalm: "Kvėpavimas",
+    remaining: (n) => `liko ${n} min`, doneMin: (n) => `Baigta — ${n} min ✓`, stoppedMin: (n) => `Sustabdyta — ${n} min įrašyta`, sessions: "seansai", minTotal: "min iš viso",
+    segState: "Būsena",
     todayState: "Šiandienos būsena", sleep: "Miegas", stress: "Stresas", fatigue: "Nuovargis", alcohol: "Alkoholis",
     yes: "Taip", no: "Ne", optNote: "Pastaba (nebūtina)", autosave: "Įrašoma automatiškai.",
     sleep7: "Miegas per 7 d.", sleepHint: "Mažiau nei 6 h — vienas dažniausių priepuolių trigerių.",
@@ -83,15 +89,14 @@ const STR = {
     notePh: "Klausimai gydytojui, savijauta, pastebėjimai…", delNote: "Ištrinti užrašą",
     report: "Ataskaita gydytojui", rSeiz: "Priepuoliai", rTypes: "Tipai", rAura: "Su aura",
     rLongest: "Ilgiausia trukmė", rAdh: "Vaistų laikymasis", rSleep: "Miegas", rSleepV: (a, s, n) => `vid. ${a} h · <6 h: ${s}/${n}`,
-    rStressFat: "Stresas / nuovargis", rOf5: "(iš 5)", rAlco: "Alkoholis", rDays: (n) => `${n} d.`,
-    rCalm: "Kvėpavimo pratimai", rCalmV: (s, m) => `${s} seansai · ${m} min`, copyText: "Kopijuoti kaip tekstą",
+    rStressFat: "Stresas / nuovargis", rOf5: "(iš 5)", rAlco: "Alkoholis", rDays: (n) => `${n} d.`, copyText: "Kopijuoti kaip tekstą",
     rNote: "Vaistų laikymasis skaičiuojamas pagal dabartinį vaistų sąrašą, todėl laikotarpiui iki vaisto pridėjimo — apytikslis.",
     rTitle: (n) => `AURA — ${n} d. ataskaita`, rPatient: "Pacientas", rFooter: "Duomenys registruoti paties paciento programėle Aura.",
     rAdhLine: (p, t, s) => `VAISTAI: laikymasis ~${p}% (${t} iš ${s} dozių)`,
     settings: "Nustatymai", language: "Kalba", profile: "Profilis", namePh: "Vardas (rodomas ataskaitoje)",
     overdueAfter: "Dozė žymima „praleista?“ po:", data: "Duomenys", exportJson: "Eksportuoti duomenis (JSON)",
     deleteAll: "Ištrinti visus duomenis", confirmAll: "Tikrai ištrinti viską? Negrįžtama", about: "Apie",
-    aboutText: "Aura · prototipas v1.2. Duomenys saugomi tik tavo paskyroje. Programėlė nėra medicinos prietaisas — priepuolių detekcijai naudok sertifikuotus įrenginius, o skubiai informacijai užsipildyk telefono Medical ID.",
+    aboutText: "Aura · prototipas v1.4. Duomenys saugomi tik tavo paskyroje. Programėlė nėra medicinos prietaisas — priepuolių detekcijai naudok sertifikuotus įrenginius, o skubiai informacijai užsipildyk telefono Medical ID.",
     aura: "Aura", edit: "Redaguoti", editSeiz: "Redaguoti priepuolį", editEvent: "Redaguoti įrašą",
     unanswered: "neatsakyta", rAnswered: (a, b) => `atsakyta ${a} iš ${b}`,
     sum30: "Per 30 dienų", sumSeiz: "priepuoliai", sumAdh: "vaistų", sumSleep: "miegas",
@@ -127,8 +132,7 @@ const STR = {
     seizStaleYes: "Taip, baigėsi", seizStaleDiscard: "Atmesti laikmatį",
     measured: "išmatuota", startedAt: "Pradžia",
     auraFeel: "Jaučiu aurą", auraLogged: "Aura užfiksuota", auraLinked: "Susieta su aura prieš {n} min.",
-    breathe: "Kvėpavimas", breatheNote: "Atsipalaidavimo pratimas.", close: "Uždaryti",
-    trigOther: "Kita", trigOtherPh: "Įrašyk savo žodžiais",
+    breathe: "Kvėpavimas", breatheNote: "Atsipalaidavimo pratimas.", close: "Uždaryti", trigOtherPh: "Įrašyk savo žodžiais",
     fbCardText: "Aura — mano asmeninis projektas, kuriamas laisvalaikiu. Jei kažko trūksta arba kažkas veikia blogai, parašyk — tai vienintelis būdas man sužinoti.",
     fbCardYes: "Parašyti", fbCardNo: "Ne dabar",
     guide: "Kaip naudotis", guideIntro: "Trumpai apie tai, kas nėra akivaizdu iš pirmo žvilgsnio.",
@@ -139,6 +143,7 @@ const STR = {
     gBackup: "Atsarginė kopija", gBackupB: "Duomenys saugomi tik šiame telefone — debesyje jų nėra. Pametus ar sugadinus telefoną kopija yra vienintelis kelias atgauti dienyną. Pasidaryk ją kas mėnesį ir išsisaugok sau į el. paštą arba Drive.",
     gPrivacy: "Privatumas", gPrivacyB: "Įrašai niekada neišeina iš telefono: nėra paskyros, serverio ir jokių tinklo užklausų. Atsiliepimą siunčiant prisegama tik programėlės versija ir įrenginio tipas, dienyno turinys — ne.",
     gDisc: "Aura nėra medicinos prietaisas ir nekeičia gydytojo. Priepuolių aptikimui skirti sertifikuoti įrenginiai, o skubiai informacijai užrakintame ekrane užsipildyk telefono Medical ID.",
+    change: "Keisti pratimą",
     ty: { tonicClonic: "Toninis-kloninis", absence: "Absansas", focal: "Židininis", myoclonic: "Miokloninis", other: "Kitas", unspec: "Nenurodyta" },
     ef: { fall: "Nukritau", injury: "Susižalojau", tongue: "Prikandau liežuvį", incontinence: "Šlapimo nelaikymas" },
     tg: { insomnia: "Nemiga", stress: "Stresas", fatigue: "Pervargimas", alcohol: "Alkoholis", missedMeds: "Praleisti vaistai", missedMeal: "Praleistas valgis", flashing: "Mirganti šviesa", illness: "Liga / karščiavimas", unknown: "Nežinoma" },
@@ -165,13 +170,10 @@ const STR = {
     statusWarn: "A seizure longer than 5 min may be status epilepticus — call emergency services immediately.",
     newEvent: "New calendar entry", eventWhat: "What? e.g. Visit my parents",
     timeOptional: "Time is optional — without it the entry is “all day”.",
-    saveEvent: "Add to calendar", noEventsDay: "No entries on this day.", addForDay: "Add for this day", upcoming: "Upcoming",
-    breathing: "Breathing", prepare: "Get ready", inhale: "Breathe in", hold: "Hold", exhale: "Breathe out",
+    saveEvent: "Add to calendar", noEventsDay: "No entries on this day.", addForDay: "Add for this day", upcoming: "Upcoming", prepare: "Get ready", inhale: "Breathe in", hold: "Hold", exhale: "Breathe out",
     pBox: "Box 4·4·4·4", pRelax: "Calming 4·7·8", start: "Start", stop: "Stop",
-    remaining: (n) => `${n} min left`, doneMin: (n) => `Done — ${n} min ✓`, stoppedMin: (n) => `Stopped — ${n} min saved`,
-    thisMonth: "This month", sessions: "sessions", minTotal: "min total",
-    calmHint: "A slow breathing exercise for relaxation.",
-    segState: "State", segCalm: "Breathing",
+    remaining: (n) => `${n} min left`, doneMin: (n) => `Done — ${n} min ✓`, stoppedMin: (n) => `Stopped — ${n} min saved`, sessions: "sessions", minTotal: "min total",
+    segState: "State",
     todayState: "Today's state", sleep: "Sleep", stress: "Stress", fatigue: "Fatigue", alcohol: "Alcohol",
     yes: "Yes", no: "No", optNote: "Note (optional)", autosave: "Saved automatically.",
     sleep7: "Sleep over 7 days", sleepHint: "Under 6 h — one of the most common seizure triggers.",
@@ -180,15 +182,14 @@ const STR = {
     notePh: "Questions for the doctor, how you feel, observations…", delNote: "Delete note",
     report: "Report for doctor", rSeiz: "Seizures", rTypes: "Types", rAura: "With aura",
     rLongest: "Longest duration", rAdh: "Medication adherence", rSleep: "Sleep", rSleepV: (a, s, n) => `avg ${a} h · <6 h: ${s}/${n}`,
-    rStressFat: "Stress / fatigue", rOf5: "(of 5)", rAlco: "Alcohol", rDays: (n) => `${n} d.`,
-    rCalm: "Breathing exercises", rCalmV: (s, m) => `${s} sessions · ${m} min`, copyText: "Copy as text",
+    rStressFat: "Stress / fatigue", rOf5: "(of 5)", rAlco: "Alcohol", rDays: (n) => `${n} d.`, copyText: "Copy as text",
     rNote: "Adherence is calculated from your current medication list, so it is approximate for periods before a medication was added.",
     rTitle: (n) => `AURA — ${n}-day report`, rPatient: "Patient", rFooter: "Data self-recorded by the patient using the Aura app.",
     rAdhLine: (p, t, s) => `MEDICATION: adherence ~${p}% (${t} of ${s} doses)`,
     settings: "Settings", language: "Language", profile: "Profile", namePh: "Name (shown in the report)",
     overdueAfter: "Mark a dose as “missed?” after:", data: "Data", exportJson: "Export data (JSON)",
     deleteAll: "Delete all data", confirmAll: "Delete everything? This cannot be undone", about: "About",
-    aboutText: "Aura · prototype v1.2. Data is stored only in your account. This app is not a medical device — use certified devices for seizure detection, and fill in your phone's Medical ID for emergencies.",
+    aboutText: "Aura · prototype v1.4. Data is stored only in your account. This app is not a medical device — use certified devices for seizure detection, and fill in your phone's Medical ID for emergencies.",
     aura: "Aura", edit: "Edit", editSeiz: "Edit seizure", editEvent: "Edit entry",
     unanswered: "not answered", rAnswered: (a, b) => `answered ${a} of ${b}`,
     sum30: "Last 30 days", sumSeiz: "seizures", sumAdh: "meds", sumSleep: "sleep",
@@ -224,8 +225,7 @@ const STR = {
     seizStaleYes: "Yes, it ended", seizStaleDiscard: "Discard timer",
     measured: "measured", startedAt: "Started",
     auraFeel: "I feel an aura", auraLogged: "Aura logged", auraLinked: "Linked to an aura {n} min ago",
-    breathe: "Breathing", breatheNote: "A relaxation exercise.", close: "Close",
-    trigOther: "Other", trigOtherPh: "Describe in your own words",
+    breathe: "Breathing", breatheNote: "A relaxation exercise.", close: "Close", trigOtherPh: "Describe in your own words",
     fbCardText: "Aura is my personal project, built in my spare time. If something is missing or something works badly, write to me — it is the only way I get to know.",
     fbCardYes: "Write to me", fbCardNo: "Not now",
     guide: "How to use", guideIntro: "The short version of what is not obvious at first glance.",
@@ -236,6 +236,7 @@ const STR = {
     gBackup: "Backup", gBackupB: "Your data lives only on this phone — there is no cloud copy. If the phone is lost or broken, a backup is the only way back. Make one monthly and send it to yourself by email or Drive.",
     gPrivacy: "Privacy", gPrivacyB: "Entries never leave the phone: no account, no server, no network requests at all. Feedback attaches only the app version and device type, never diary content.",
     gDisc: "Aura is not a medical device and does not replace your doctor. Use certified devices for seizure detection, and fill in your phone's Medical ID for emergency information on the lock screen.",
+    change: "Change exercise",
     ty: { tonicClonic: "Tonic-clonic", absence: "Absence", focal: "Focal", myoclonic: "Myoclonic", other: "Other", unspec: "Unspecified" },
     ef: { fall: "I fell", injury: "Injured myself", tongue: "Bit my tongue", incontinence: "Incontinence" },
     tg: { insomnia: "Poor sleep", stress: "Stress", fatigue: "Exhaustion", alcohol: "Alcohol", missedMeds: "Missed meds", missedMeal: "Missed meal", flashing: "Flashing lights", illness: "Illness / fever", unknown: "Unknown" },
@@ -262,13 +263,10 @@ const STR = {
     statusWarn: "Приступ дольше 5 минут может быть эпилептическим статусом — нужна срочная помощь (112).",
     newEvent: "Новая запись в календаре", eventWhat: "Что? напр. Зайти к родителям",
     timeOptional: "Время необязательно — без него запись будет «весь день».",
-    saveEvent: "Добавить в календарь", noEventsDay: "В этот день записей нет.", addForDay: "Добавить на этот день", upcoming: "Ближайшие",
-    breathing: "Дыхание", prepare: "Приготовьтесь", inhale: "Вдох", hold: "Задержка", exhale: "Выдох",
+    saveEvent: "Добавить в календарь", noEventsDay: "В этот день записей нет.", addForDay: "Добавить на этот день", upcoming: "Ближайшие", prepare: "Приготовьтесь", inhale: "Вдох", hold: "Задержка", exhale: "Выдох",
     pBox: "Квадрат 4·4·4·4", pRelax: "Расслабление 4·7·8", start: "Начать", stop: "Остановить",
-    remaining: (n) => `осталось ${n} мин`, doneMin: (n) => `Готово — ${n} мин ✓`, stoppedMin: (n) => `Остановлено — ${n} мин записано`,
-    thisMonth: "В этом месяце", sessions: "сеансы", minTotal: "мин всего",
-    calmHint: "Упражнение на медленное дыхание для расслабления.",
-    segState: "Состояние", segCalm: "Дыхание",
+    remaining: (n) => `осталось ${n} мин`, doneMin: (n) => `Готово — ${n} мин ✓`, stoppedMin: (n) => `Остановлено — ${n} мин записано`, sessions: "сеансы", minTotal: "мин всего",
+    segState: "Состояние",
     todayState: "Состояние сегодня", sleep: "Сон", stress: "Стресс", fatigue: "Усталость", alcohol: "Алкоголь",
     yes: "Да", no: "Нет", optNote: "Заметка (необязательно)", autosave: "Сохраняется автоматически.",
     sleep7: "Сон за 7 дней", sleepHint: "Меньше 6 ч — один из самых частых триггеров приступов.",
@@ -277,15 +275,14 @@ const STR = {
     notePh: "Вопросы врачу, самочувствие, наблюдения…", delNote: "Удалить заметку",
     report: "Отчёт для врача", rSeiz: "Приступы", rTypes: "Типы", rAura: "С аурой",
     rLongest: "Самый долгий", rAdh: "Соблюдение приёма", rSleep: "Сон", rSleepV: (a, s, n) => `сред. ${a} ч · <6 ч: ${s}/${n}`,
-    rStressFat: "Стресс / усталость", rOf5: "(из 5)", rAlco: "Алкоголь", rDays: (n) => `${n} д.`,
-    rCalm: "Дыхательные упражнения", rCalmV: (s, m) => `${s} сеансов · ${m} мин`, copyText: "Скопировать как текст",
+    rStressFat: "Стресс / усталость", rOf5: "(из 5)", rAlco: "Алкоголь", rDays: (n) => `${n} д.`, copyText: "Скопировать как текст",
     rNote: "Соблюдение приёма считается по текущему списку лекарств, поэтому для периода до добавления лекарства оно приблизительно.",
     rTitle: (n) => `AURA — отчёт за ${n} д.`, rPatient: "Пациент", rFooter: "Данные записаны самим пациентом в приложении Aura.",
     rAdhLine: (p, t, s) => `ЛЕКАРСТВА: соблюдение ~${p}% (${t} из ${s} доз)`,
     settings: "Настройки", language: "Язык", profile: "Профиль", namePh: "Имя (показывается в отчёте)",
     overdueAfter: "Отмечать дозу «пропущено?» через:", data: "Данные", exportJson: "Экспорт данных (JSON)",
     deleteAll: "Удалить все данные", confirmAll: "Точно удалить всё? Необратимо", about: "О приложении",
-    aboutText: "Aura · прототип v1.2. Данные хранятся только в вашей учётной записи. Приложение не медицинский прибор — для обнаружения приступов используйте сертифицированные устройства, а для экстренных случаев заполните Medical ID в телефоне.",
+    aboutText: "Aura · прототип v1.4. Данные хранятся только в вашей учётной записи. Приложение не медицинский прибор — для обнаружения приступов используйте сертифицированные устройства, а для экстренных случаев заполните Medical ID в телефоне.",
     aura: "Аура", edit: "Изменить", editSeiz: "Изменить приступ", editEvent: "Изменить запись",
     unanswered: "нет ответа", rAnswered: (a, b) => `отвечено ${a} из ${b}`,
     sum30: "За 30 дней", sumSeiz: "приступы", sumAdh: "лекарства", sumSleep: "сон",
@@ -321,8 +318,7 @@ const STR = {
     seizStaleYes: "Да, закончился", seizStaleDiscard: "Отменить таймер",
     measured: "измерено", startedAt: "Начало",
     auraFeel: "Чувствую ауру", auraLogged: "Аура записана", auraLinked: "Связано с аурой {n} мин назад",
-    breathe: "Дыхание", breatheNote: "Упражнение на расслабление.", close: "Закрыть",
-    trigOther: "Другое", trigOtherPh: "Опишите своими словами",
+    breathe: "Дыхание", breatheNote: "Упражнение на расслабление.", close: "Закрыть", trigOtherPh: "Опишите своими словами",
     fbCardText: "Aura — мой личный проект, который я делаю в свободное время. Если чего-то не хватает или что-то работает плохо, напишите — это единственный способ мне об этом узнать.",
     fbCardYes: "Написать", fbCardNo: "Не сейчас",
     guide: "Как пользоваться", guideIntro: "Коротко о том, что не очевидно с первого взгляда.",
@@ -333,6 +329,7 @@ const STR = {
     gBackup: "Резервная копия", gBackupB: "Данные хранятся только на этом телефоне — в облаке их нет. При утере или поломке копия — единственный способ вернуть дневник. Делайте её ежемесячно и отправляйте себе на почту или в Drive.",
     gPrivacy: "Приватность", gPrivacyB: "Записи никогда не покидают телефон: нет аккаунта, сервера и сетевых запросов. К отзыву прилагается только версия приложения и тип устройства, содержимое дневника — нет.",
     gDisc: "Aura не является медицинским прибором и не заменяет врача. Для обнаружения приступов используйте сертифицированные устройства, а для экстренной информации на экране блокировки заполните Medical ID.",
+    change: "Изменить упражнение",
     ty: { tonicClonic: "Тонико-клонический", absence: "Абсанс", focal: "Фокальный", myoclonic: "Миоклонический", other: "Другой", unspec: "Не указан" },
     ef: { fall: "Упал(а)", injury: "Травма", tongue: "Прикус языка", incontinence: "Недержание мочи" },
     tg: { insomnia: "Недосып", stress: "Стресс", fatigue: "Переутомление", alcohol: "Алкоголь", missedMeds: "Пропуск лекарств", missedMeal: "Пропуск еды", flashing: "Мерцающий свет", illness: "Болезнь / жар", unknown: "Неизвестно" },
@@ -359,13 +356,10 @@ const STR = {
     statusWarn: "Napad dłuższy niż 5 min może być stanem padaczkowym — konieczna pilna pomoc (112).",
     newEvent: "Nowy wpis w kalendarzu", eventWhat: "Co? np. Odwiedzić rodziców",
     timeOptional: "Godzina nieobowiązkowa — bez niej wpis będzie „cały dzień”.",
-    saveEvent: "Dodaj do kalendarza", noEventsDay: "Brak wpisów w tym dniu.", addForDay: "Dodaj na ten dzień", upcoming: "Najbliższe",
-    breathing: "Oddech", prepare: "Przygotuj się", inhale: "Wdech", hold: "Wstrzymaj", exhale: "Wydech",
+    saveEvent: "Dodaj do kalendarza", noEventsDay: "Brak wpisów w tym dniu.", addForDay: "Dodaj na ten dzień", upcoming: "Najbliższe", prepare: "Przygotuj się", inhale: "Wdech", hold: "Wstrzymaj", exhale: "Wydech",
     pBox: "Kwadrat 4·4·4·4", pRelax: "Uspokojenie 4·7·8", start: "Zacznij", stop: "Zatrzymaj",
-    remaining: (n) => `pozostało ${n} min`, doneMin: (n) => `Gotowe — ${n} min ✓`, stoppedMin: (n) => `Zatrzymano — zapisano ${n} min`,
-    thisMonth: "W tym miesiącu", sessions: "sesje", minTotal: "min łącznie",
-    calmHint: "Ćwiczenie powolnego oddechu dla relaksu.",
-    segState: "Stan", segCalm: "Oddech",
+    remaining: (n) => `pozostało ${n} min`, doneMin: (n) => `Gotowe — ${n} min ✓`, stoppedMin: (n) => `Zatrzymano — zapisano ${n} min`, sessions: "sesje", minTotal: "min łącznie",
+    segState: "Stan",
     todayState: "Dzisiejszy stan", sleep: "Sen", stress: "Stres", fatigue: "Zmęczenie", alcohol: "Alkohol",
     yes: "Tak", no: "Nie", optNote: "Notatka (opcjonalnie)", autosave: "Zapisywane automatycznie.",
     sleep7: "Sen przez 7 dni", sleepHint: "Poniżej 6 h — jeden z najczęstszych wyzwalaczy napadów.",
@@ -374,15 +368,14 @@ const STR = {
     notePh: "Pytania do lekarza, samopoczucie, spostrzeżenia…", delNote: "Usuń notatkę",
     report: "Raport dla lekarza", rSeiz: "Napady", rTypes: "Typy", rAura: "Z aurą",
     rLongest: "Najdłuższy", rAdh: "Przestrzeganie leczenia", rSleep: "Sen", rSleepV: (a, s, n) => `śr. ${a} h · <6 h: ${s}/${n}`,
-    rStressFat: "Stres / zmęczenie", rOf5: "(z 5)", rAlco: "Alkohol", rDays: (n) => `${n} dni`,
-    rCalm: "Ćwiczenia oddechowe", rCalmV: (s, m) => `${s} sesji · ${m} min`, copyText: "Kopiuj jako tekst",
+    rStressFat: "Stres / zmęczenie", rOf5: "(z 5)", rAlco: "Alkohol", rDays: (n) => `${n} dni`, copyText: "Kopiuj jako tekst",
     rNote: "Przestrzeganie liczone jest na podstawie bieżącej listy leków, więc dla okresu przed dodaniem leku jest przybliżone.",
     rTitle: (n) => `AURA — raport z ${n} dni`, rPatient: "Pacjent", rFooter: "Dane zapisane samodzielnie przez pacjenta w aplikacji Aura.",
     rAdhLine: (p, t, s) => `LEKI: przestrzeganie ~${p}% (${t} z ${s} dawek)`,
     settings: "Ustawienia", language: "Język", profile: "Profil", namePh: "Imię (widoczne w raporcie)",
     overdueAfter: "Oznacz dawkę „pominięto?” po:", data: "Dane", exportJson: "Eksportuj dane (JSON)",
     deleteAll: "Usuń wszystkie dane", confirmAll: "Na pewno usunąć wszystko? Nieodwracalne", about: "O aplikacji",
-    aboutText: "Aura · prototyp v1.2. Dane są przechowywane tylko na Twoim koncie. Aplikacja nie jest wyrobem medycznym — do wykrywania napadów używaj certyfikowanych urządzeń, a na wypadek nagły wypełnij Medical ID w telefonie.",
+    aboutText: "Aura · prototyp v1.4. Dane są przechowywane tylko na Twoim koncie. Aplikacja nie jest wyrobem medycznym — do wykrywania napadów używaj certyfikowanych urządzeń, a na wypadek nagły wypełnij Medical ID w telefonie.",
     aura: "Aura", edit: "Edytuj", editSeiz: "Edytuj napad", editEvent: "Edytuj wpis",
     unanswered: "brak odpowiedzi", rAnswered: (a, b) => `odpowiedzi: ${a} z ${b}`,
     sum30: "Ostatnie 30 dni", sumSeiz: "napady", sumAdh: "leki", sumSleep: "sen",
@@ -418,8 +411,7 @@ const STR = {
     seizStaleYes: "Tak, skończył się", seizStaleDiscard: "Odrzuć stoper",
     measured: "zmierzone", startedAt: "Początek",
     auraFeel: "Czuję aurę", auraLogged: "Aura zapisana", auraLinked: "Powiązane z aurą sprzed {n} min",
-    breathe: "Oddech", breatheNote: "Ćwiczenie relaksacyjne.", close: "Zamknij",
-    trigOther: "Inne", trigOtherPh: "Opisz własnymi słowami",
+    breathe: "Oddech", breatheNote: "Ćwiczenie relaksacyjne.", close: "Zamknij", trigOtherPh: "Opisz własnymi słowami",
     fbCardText: "Aura to mój osobisty projekt, tworzony po godzinach. Jeśli czegoś brakuje albo coś działa źle, napisz — to jedyny sposób, żebym się o tym dowiedział.",
     fbCardYes: "Napisz", fbCardNo: "Nie teraz",
     guide: "Jak korzystać", guideIntro: "Krótko o tym, co nie jest oczywiste na pierwszy rzut oka.",
@@ -430,6 +422,7 @@ const STR = {
     gBackup: "Kopia zapasowa", gBackupB: "Dane są tylko na tym telefonie — nie ma kopii w chmurze. Po utracie lub awarii telefonu kopia to jedyny sposób odzyskania dziennika. Rób ją co miesiąc i wysyłaj sobie e-mailem lub na Drive.",
     gPrivacy: "Prywatność", gPrivacyB: "Wpisy nigdy nie opuszczają telefonu: brak konta, serwera i jakichkolwiek zapytań sieciowych. Do opinii dołączana jest tylko wersja aplikacji i typ urządzenia, nigdy treść dziennika.",
     gDisc: "Aura nie jest wyrobem medycznym i nie zastępuje lekarza. Do wykrywania napadów używaj certyfikowanych urządzeń, a na wypadek nagły wypełnij Medical ID w telefonie.",
+    change: "Zmień ćwiczenie",
     ty: { tonicClonic: "Toniczno-kloniczny", absence: "Napad nieświadomości", focal: "Ogniskowy", myoclonic: "Miokloniczny", other: "Inny", unspec: "Nieokreślony" },
     ef: { fall: "Upadek", injury: "Uraz", tongue: "Przygryzienie języka", incontinence: "Nietrzymanie moczu" },
     tg: { insomnia: "Niedobór snu", stress: "Stres", fatigue: "Przemęczenie", alcohol: "Alkohol", missedMeds: "Pominięte leki", missedMeal: "Pominięty posiłek", flashing: "Migające światło", illness: "Choroba / gorączka", unknown: "Nieznane" },
@@ -507,7 +500,7 @@ const relLabel = (dateStr, t) => {
 };
 
 const FEEDBACK_TO = "jormor16@valdorfas.org";
-const APP_VERSION = "1.2";
+const APP_VERSION = "1.4";
 const DEFAULT_DATA = { meds: [], doseLog: {}, seizures: [], daily: {}, notes: [], events: [], calm: [], auraTypes: [], auraEvents: [], settings: { name: "", overdueMin: 60, lang: "lt", notify: true, backupRemind: true, opens: 0, fbCard: "pending" } };
 const AURA_LINK_MIN = 60;   // per kiek laiko po auros priepuolis laikomas susijusiu
 const DAILY_EMPTY = { sleep: null, stress: null, fatigue: null, alcohol: null, note: "" };
@@ -599,7 +592,7 @@ function DeleteBtn({ onConfirm, t }) {
   if (armed) {
     return <button onClick={onConfirm} style={{ fontSize: 13, fontWeight: 600, color: C.red, padding: "4px 10px", borderRadius: 999, background: C.redSoft }}>{t.deleteQ}</button>;
   }
-  return <button onClick={() => setArmed(true)} aria-label={t.del} style={{ padding: 6, color: C.sub }}><Trash2 size={16} /></button>;
+  return <button onClick={() => setArmed(true)} aria-label={t.del} style={iconBtn}><Trash2 size={16} /></button>;
 }
 
 function Sheet({ title, onClose, children, t }) {
@@ -609,7 +602,7 @@ function Sheet({ title, onClose, children, t }) {
       <div style={{ position: "relative", width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", background: C.bg, borderRadius: "18px 18px 0 0", padding: "18px 18px 28px", boxShadow: "0 -4px 24px rgba(61,57,41,0.12)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div style={{ fontFamily: T.serif, fontSize: 20, fontWeight: 600 }}>{title}</div>
-          <button onClick={onClose} aria-label={t.close} style={{ padding: 8, color: C.sub }}><X size={20} /></button>
+          <button onClick={onClose} aria-label={t.close} style={iconBtn}><X size={20} /></button>
         </div>
         {children}
       </div>
@@ -626,6 +619,11 @@ function PrimaryBtn({ onClick, children, disabled, color = C.clay, style }) {
     }}>{children}</button>
   );
 }
+
+const iconBtn = {
+  width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+  display: "flex", alignItems: "center", justifyContent: "center", color: C.sub,
+};
 
 const inputStyle = { width: "100%", padding: "11px 14px", borderRadius: 10, border: `1px solid ${C.line}`, background: C.white, fontSize: 15, color: C.ink, fontFamily: T.body };
 
@@ -822,7 +820,7 @@ function MedsView({ data, update, t, lc, onReport, timer, onStartTimer, onEndTim
                 {m.dose && <div style={{ fontSize: 13, color: C.sub }}>{m.dose}</div>}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-              <button className="press" onClick={() => setEditing(m)} aria-label={t.edit} style={{ padding: 6, color: C.sub }}><Pencil size={16} /></button>
+              <button className="press" onClick={() => setEditing(m)} aria-label={t.edit} style={iconBtn}><Pencil size={16} /></button>
               <DeleteBtn t={t} onConfirm={() => update((d) => {
                 d.meds = d.meds.filter((x) => x.id !== m.id);
                 Object.keys(d.doseLog).forEach((k) => {
@@ -1048,7 +1046,7 @@ function SeizuresView({ data, update, t, lc, onReport, quickLog, measured, onMea
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div style={{ fontWeight: 600, fontSize: 15 }}>{fDateTime(s.at, lc)}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <button className="press" onClick={() => setEditing(s)} aria-label={t.edit} style={{ padding: 6, color: C.sub }}><Pencil size={16} /></button>
+                <button className="press" onClick={() => setEditing(s)} aria-label={t.edit} style={iconBtn}><Pencil size={16} /></button>
                 <DeleteBtn t={t} onConfirm={() => update((d) => { d.seizures = d.seizures.filter((x) => x.id !== s.id); return d; })} />
               </div>
             </div>
@@ -1137,7 +1135,7 @@ function EventRow({ e, onDelete, onEdit, showDate, t, lc }) {
           {showDate && e.time ? ` · ${e.time}` : ""}
         </div>
       </div>
-      <button className="press" onClick={onEdit} aria-label={t.edit} style={{ padding: 6, color: C.sub }}><Pencil size={15} /></button>
+      <button className="press" onClick={onEdit} aria-label={t.edit} style={iconBtn}><Pencil size={15} /></button>
       <DeleteBtn t={t} onConfirm={onDelete} />
     </div>
   );
@@ -1180,9 +1178,9 @@ function CalendarView({ data, update, t, lc }) {
     <div>
       <Card style={{ marginTop: 16, padding: 14 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <button className="press" onClick={() => setCur(new Date(y, m - 1, 1))} aria-label={t.prev} style={{ padding: 6, color: C.sub }}><ChevronLeft size={20} /></button>
+          <button className="press" onClick={() => setCur(new Date(y, m - 1, 1))} aria-label={t.prev} style={iconBtn}><ChevronLeft size={20} /></button>
           <div style={{ fontFamily: T.serif, fontSize: 18, fontWeight: 600, textTransform: "capitalize" }}>{fMonth(cur, lc)}</div>
-          <button className="press" onClick={() => setCur(new Date(y, m + 1, 1))} aria-label={t.next} style={{ padding: 6, color: C.sub }}><ChevronRight size={20} /></button>
+          <button className="press" onClick={() => setCur(new Date(y, m + 1, 1))} aria-label={t.next} style={iconBtn}><ChevronRight size={20} /></button>
         </div>
         <div {...swipe} style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, touchAction: "pan-y" }}>
           {WD_MON.map((w, i) => <div key={i} style={{ textAlign: "center", fontSize: 11, color: C.sub, fontWeight: 600, paddingBottom: 4 }}>{w}</div>)}
@@ -1246,30 +1244,31 @@ const PATTERNS = {
   relax: { key: "pRelax", phases: [{ l: "inhale", s: 4, sc: 1.22 }, { l: "hold", s: 7 }, { l: "exhale", s: 8, sc: 0.72 }] },
 };
 
-function CalmView({ data, update, t }) {
+function CalmView({ data, update, t, onClose }) {
   const [patKey, setPatKey] = useState("box");
   const [minutes, setMinutes] = useState(5);
-  const [run, setRun] = useState(null); // { startedAt|null, acc, limit } — startedAt null = pauzė
+  const [run, setRun] = useState(null);      // { startedAt|null, acc, limit }
+  const [opts, setOpts] = useState(false);
   const [, setTick] = useState(0);
-  const [doneMsg, setDoneMsg] = useState("");
   const phases = PATTERNS[patKey].phases;
 
-  // fazių ciklas ir kiekvienos fazės mastelis (sulaikymas paveldi ankstesnį)
   const { cycle, scales } = useMemo(() => {
     let last = 1;
     const sc = phases.map((p) => { if (p.sc !== undefined) last = p.sc; return last; });
     return { cycle: phases.reduce((a, p) => a + p.s, 0), scales: sc };
   }, [patKey]);
 
-  const save = (mins) => update((d) => { d.calm.push({ id: uid(), at: new Date().toISOString(), minutes: mins }); return d; });
-
   const elapsedOf = (r) => (r ? r.acc + (r.startedAt ? (Date.now() - r.startedAt) / 1000 : 0) : 0);
+  const save = (mins) => update((d) => { d.calm = d.calm || []; d.calm.push({ id: uid(), at: new Date().toISOString(), minutes: mins }); return d; });
+
+  // Atsidaro tada, kai žmogus ką tik pajuto aurą — konfigūruoti nėra kada.
+  // Pratimas prasideda pats; nustatymai lieka pasiekiami, bet netrukdo.
+  useEffect(() => { setRun({ startedAt: Date.now(), acc: 0, limit: minutes * 60 }); }, []);
 
   useEffect(() => {
     if (!run || !run.startedAt) return;
     const iv = setInterval(() => {
-      const el = elapsedOf(run);
-      if (el >= run.limit) { save(Math.round(run.limit / 60)); setDoneMsg(t.doneMin(Math.round(run.limit / 60))); setRun(null); }
+      if (elapsedOf(run) >= run.limit) { save(Math.round(run.limit / 60)); setRun(null); }
       else setTick((x) => x + 1);
     }, 250);
     return () => clearInterval(iv);
@@ -1285,77 +1284,95 @@ function CalmView({ data, update, t }) {
     }
   }
   const ph = run ? phases[idx] : null;
+  const paused = run && !run.startedAt;
+  const done = !run;
+  const pct = run ? Math.min(1, elapsed / run.limit) : 1;
 
-  const start = () => { setDoneMsg(""); setRun({ startedAt: Date.now(), acc: 0, limit: minutes * 60 }); };
-  const pause = () => setRun((r) => (r && r.startedAt ? { ...r, startedAt: null, acc: elapsedOf(r) } : r));
-  const resume = () => setRun((r) => (r && !r.startedAt ? { ...r, startedAt: Date.now() } : r));
-  const stop = () => {
-    const mins = Math.round(elapsed / 60);
-    if (run && elapsed >= 60) { save(mins); setDoneMsg(t.stoppedMin(mins)); }
+  const begin = (mins = minutes) => { setOpts(false); setRun({ startedAt: Date.now(), acc: 0, limit: mins * 60 }); };
+  const finish = () => {
+    if (run && elapsed >= 60) save(Math.round(elapsed / 60));
     setRun(null);
   };
 
-  const now = new Date();
-  const monthSessions = data.calm.filter((s) => { const d = new Date(s.at); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); });
-  const monthMin = monthSessions.reduce((a, s) => a + s.minutes, 0);
+  const R = 92, CIRC = 2 * Math.PI * R;
 
   return (
-    <div>
-      <SectionLabel style={{ marginTop: 12 }}>{t.breathing}</SectionLabel>
-      <Card style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "26px 16px", gap: 18 }}>
-        <div style={{ height: 210, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{
-            width: 164, height: 164, borderRadius: "50%", border: `1.5px solid ${C.clay}`, background: C.claySoft,
-            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-            transform: `scale(${run ? scales[idx] : 0.9})`, transition: `transform ${ph ? ph.s : 1}s ease-in-out`,
-          }}>
-            <div style={{ fontFamily: T.serif, fontSize: 21, fontWeight: 600, color: C.clayDark }}>{run && !run.startedAt ? t.paused : ph ? t[ph.l] : t.prepare}</div>
-            <div style={{ fontFamily: T.serif, fontSize: 38, fontWeight: 700, lineHeight: 1.1, color: C.ink }}>{run ? left : ""}</div>
-          </div>
-        </div>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: 8 }}>
+      <div style={{ position: "relative", width: 220, height: 220, display: "flex", alignItems: "center", justifyContent: "center", marginTop: 6 }}>
+        {/* eigos žiedas – be mirgėjimo, tik lėtas užsipildymas */}
+        <svg width="220" height="220" style={{ position: "absolute", transform: "rotate(-90deg)" }} aria-hidden="true">
+          <circle cx="110" cy="110" r={R} fill="none" stroke={C.line} strokeWidth="2" />
+          <circle cx="110" cy="110" r={R} fill="none" stroke={C.blue} strokeWidth="2.5" strokeLinecap="round"
+            strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - pct)}
+            style={{ transition: "stroke-dashoffset 300ms linear" }} />
+        </svg>
 
-        {!run ? (
+        {/* kvėpavimo rutulys */}
+        <div style={{
+          width: 150, height: 150, borderRadius: "50%",
+          background: `radial-gradient(circle at 38% 32%, ${C.white}, ${C.blueSoft} 62%)`,
+          border: `1px solid ${C.blue}33`,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+          transform: `scale(${run && !paused ? scales[idx] : 0.86})`,
+          transition: `transform ${ph && !paused ? ph.s : 1}s ease-in-out`,
+          opacity: paused ? 0.55 : 1,
+        }}>
+          <div style={{ fontFamily: T.serif, fontSize: 20, fontWeight: 600, color: C.blue }}>
+            {done ? t.prepare : paused ? t.paused : t[ph.l]}
+          </div>
+          {run && !paused && (
+            <div style={{ fontFamily: T.serif, fontSize: 34, fontWeight: 700, lineHeight: 1, color: C.ink, fontVariantNumeric: "tabular-nums" }}>{left}</div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ fontSize: 12.5, color: C.sub, marginTop: 14, fontVariantNumeric: "tabular-nums" }}>
+        {run ? `${t[PATTERNS[patKey].key]} · ${t.remaining(Math.max(0, Math.ceil((run.limit - elapsed) / 60)))}` : t.breatheNote}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 16, width: "100%", maxWidth: 300 }}>
+        {run ? (
           <>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-              {Object.entries(PATTERNS).map(([k, p]) => <Chip key={k} active={patKey === k} onClick={() => setPatKey(k)}>{t[p.key]}</Chip>)}
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              {[2, 5, 10].map((n) => <Chip key={n} active={minutes === n} onClick={() => setMinutes(n)} color={C.sage} soft={C.sageSoft}>{n} min</Chip>)}
-            </div>
-            <PrimaryBtn onClick={start} style={{ maxWidth: 260 }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Play size={17} /> {t.start}</span>
+            <PrimaryBtn color={C.blue}
+              onClick={() => setRun((r) => (r.startedAt ? { ...r, startedAt: null, acc: elapsedOf(r) } : { ...r, startedAt: Date.now() }))}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                {paused ? <Play size={15} /> : <Pause size={15} />} {paused ? t.resume : t.pause}
+              </span>
             </PrimaryBtn>
-            {doneMsg && <div style={{ fontSize: 14, fontWeight: 600, color: C.sage }}>{doneMsg}</div>}
+            <PrimaryBtn color={C.sub} onClick={finish}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Square size={14} /> {t.stop}</span>
+            </PrimaryBtn>
           </>
         ) : (
           <>
-            <div style={{ fontSize: 13, color: C.sub }}>{t[PATTERNS[patKey].key]} · {t.remaining(Math.max(0, Math.ceil((run.limit - elapsed) / 60)))}</div>
-            <div style={{ display: "flex", gap: 8, width: "100%", maxWidth: 260 }}>
-              <PrimaryBtn color={C.clay} onClick={run.startedAt ? pause : resume}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  {run.startedAt ? <Pause size={15} /> : <Play size={15} />} {run.startedAt ? t.pause : t.resume}
-                </span>
-              </PrimaryBtn>
-              <PrimaryBtn color={C.red} onClick={stop}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Square size={15} /> {t.stop}</span>
-              </PrimaryBtn>
-            </div>
+            <PrimaryBtn color={C.blue} onClick={() => begin()}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Play size={15} /> {t.start}</span>
+            </PrimaryBtn>
           </>
         )}
-      </Card>
+      </div>
 
-      <SectionLabel>{t.thisMonth}</SectionLabel>
-      <Card style={{ display: "flex", gap: 12, padding: 12 }}>
-        <div style={{ flex: 1, textAlign: "center" }}>
-          <div style={{ fontFamily: T.serif, fontSize: 26, fontWeight: 700, color: C.clay, lineHeight: 1.1 }}>{monthSessions.length}</div>
-          <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>{t.sessions}</div>
+      {/* nustatymai nepuola į akis: reikalingi retai, o pratimo metu – niekada */}
+      {(done || paused) && (
+        <button className="press" onClick={() => setOpts(!opts)}
+          style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginTop: 14, padding: 6 }}>
+          {t.change}
+        </button>
+      )}
+      {opts && (done || paused) && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginTop: 4 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+            {Object.entries(PATTERNS).map(([k, p]) => (
+              <Chip key={k} active={patKey === k} onClick={() => { setPatKey(k); setRun(null); }} color={C.blue} soft={C.blueSoft}>{t[p.key]}</Chip>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[2, 5, 10].map((n) => (
+              <Chip key={n} active={minutes === n} onClick={() => { setMinutes(n); begin(n); }} color={C.blue} soft={C.blueSoft}>{n} min</Chip>
+            ))}
+          </div>
         </div>
-        <div style={{ flex: 1, textAlign: "center" }}>
-          <div style={{ fontFamily: T.serif, fontSize: 26, fontWeight: 700, color: C.sage, lineHeight: 1.1 }}>{monthMin}</div>
-          <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>{t.minTotal}</div>
-        </div>
-      </Card>
-      <div style={{ fontSize: 12, color: C.sub, margin: "12px 4px 0", lineHeight: 1.5 }}>{t.calmHint}</div>
+      )}
     </div>
   );
 }
@@ -1369,10 +1386,15 @@ function DotScale({ value, onChange, label }) {
         {[1, 2, 3, 4, 5].map((n) => {
           const on = value >= n;
           const col = value >= 4 ? C.amber : C.sage;
-          return <button key={n} className="press" onClick={() => onChange(n)} aria-label={`${label} ${n}`} style={{
-            width: 30, height: 30, borderRadius: "50%", border: `1.5px solid ${on ? col : C.line}`,
-            background: on ? col : C.white, transition: "all 120ms ease",
-          }} />;
+          return (
+            <button key={n} className="press" onClick={() => onChange(n)} aria-label={`${label} ${n}`}
+              style={{ width: 40, height: 44, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{
+                width: 28, height: 28, borderRadius: "50%", border: `1.5px solid ${on ? col : C.line}`,
+                background: on ? col : C.white, transition: "all 120ms ease",
+              }} />
+            </button>
+          );
         })}
       </div>
     </div>
@@ -1388,17 +1410,17 @@ function StateView({ data, update, t, lc }) {
   const setField = (k, v) => update((d) => { d.daily[tk] = { ...DAILY_EMPTY, ...(d.daily[tk] || {}), [k]: v }; return d; });
   const days = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i - 6));
   const WD = wdShort(lc);
-  const stepBtn = { width: 36, height: 36, borderRadius: 10, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", background: C.white };
+  const stepBtn = { width: 44, height: 44, borderRadius: 10, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", background: C.white };
 
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
-        <button className="press" onClick={() => setOffset(offset + 1)} aria-label={t.prev} style={{ padding: 8, color: C.sub }}><ChevronLeft size={20} /></button>
+        <button className="press" onClick={() => setOffset(offset + 1)} aria-label={t.prev} style={iconBtn}><ChevronLeft size={20} /></button>
         <div style={{ fontFamily: T.serif, fontSize: 16, fontWeight: 600, textTransform: "capitalize" }}>
           {offset === 0 ? t.todayState : fDay(day, lc)}
         </div>
         <button className="press" onClick={() => setOffset(Math.max(0, offset - 1))} disabled={offset === 0} aria-label={t.next}
-          style={{ padding: 8, color: offset === 0 ? C.line : C.sub }}><ChevronRight size={20} /></button>
+          style={{ ...iconBtn, color: offset === 0 ? C.line : C.sub }}><ChevronRight size={20} /></button>
       </div>
       <Card style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1544,8 +1566,6 @@ function buildReport(data, days, t) {
   const fatAvg = avg(dailies.filter((e) => e.fatigue != null).map((e) => e.fatigue));
   const alcoN = dailies.filter((e) => e.alcohol === true).length;
   const alcoAns = dailies.filter((e) => e.alcohol === true || e.alcohol === false).length;
-  const calm = data.calm.filter((s) => new Date(s.at) >= since);
-  const calmMin = calm.reduce((a, s) => a + s.minutes, 0);
 
   const fmt = (arr) => arr.map(([k, v]) => `${k} ×${v}`).join(", ");
   const L = [];
@@ -1570,10 +1590,9 @@ function buildReport(data, days, t) {
   if (sleepAvg != null) L.push(`${t.rSleep.toUpperCase()}: ${t.rSleepV(sleepAvg, shortN, sleeps.length)}`);
   if (stressAvg != null || fatAvg != null) L.push(`${t.rStressFat.toUpperCase()}: ${stressAvg ?? "—"} / ${fatAvg ?? "—"} ${t.rOf5}`);
   if (alcoAns) L.push(`${t.rAlco.toUpperCase()}: ${t.rDays(alcoN)}` + ` (${t.rAnswered(alcoAns, days)})`);
-  if (calm.length) L.push(`${t.rCalm.toUpperCase()}: ${t.rCalmV(calm.length, calmMin)}`);
   L.push("");
   L.push(t.rFooter);
-  return { text: L.join("\n"), seiz, types, trigs, effs, auraN, auraAns, auraKinds, alcoAns, adhDays, durMax, adh, taken, scheduled, sleepAvg, shortN, sleepsN: sleeps.length, stressAvg, fatAvg, alcoN, calmN: calm.length, calmMin };
+  return { text: L.join("\n"), seiz, types, trigs, effs, auraN, auraAns, auraKinds, alcoAns, adhDays, durMax, adh, taken, scheduled, sleepAvg, shortN, sleepsN: sleeps.length, stressAvg, fatAvg, alcoN };
 }
 
 function Stat({ label, value, color = C.ink }) {
@@ -1611,7 +1630,6 @@ function ReportSheet({ data, onClose, t }) {
         {r.sleepAvg != null && <Stat label={t.rSleep} value={t.rSleepV(r.sleepAvg, r.shortN, r.sleepsN)} />}
         {(r.stressAvg != null || r.fatAvg != null) && <Stat label={t.rStressFat} value={`${r.stressAvg ?? "—"} / ${r.fatAvg ?? "—"} ${t.rOf5}`} />}
         {r.alcoAns > 0 && <Stat label={t.rAlco} value={`${t.rDays(r.alcoN)} · ${t.rAnswered(r.alcoAns, days)}`} />}
-        {r.calmN > 0 && <Stat label={t.rCalm} value={t.rCalmV(r.calmN, r.calmMin)} />}
       </Card>
       <PrimaryBtn onClick={copy} style={{ marginTop: 14 }}>{copied ? t.copied : t.copyText}</PrimaryBtn>
       <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>{t.rNote}</div>
@@ -1675,8 +1693,10 @@ function SeizureTimer({ timer, t, onEnd, onDiscard, onConfirmStale }) {
   return (
     <Card style={{
       marginTop: 14, textAlign: "center",
-      borderColor: alert ? C.red : C.plum, borderWidth: alert ? 2 : 1,
+      borderColor: alert ? C.red : C.plum, borderWidth: 2,
       background: alert ? C.redSoft : C.card,
+      // 600 ms perėjimas, o ne staigus perjungimas: perėjimas į raudoną yra rizikos veiksnys
+      transition: "background-color 600ms ease, border-color 600ms ease",
     }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: alert ? C.red : C.plum, letterSpacing: "0.04em", textTransform: "uppercase" }}>
         {t.seizRunning}
@@ -1685,9 +1705,16 @@ function SeizureTimer({ timer, t, onEnd, onDiscard, onConfirmStale }) {
         {fmtDuration(sec)}
       </div>
       {alert && (
-        <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 10, background: C.red, color: "#FFF" }}>
-          <div style={{ fontSize: 14.5, fontWeight: 700, lineHeight: 1.4 }}>{t.seizAlert}</div>
-          <div style={{ fontSize: 12, opacity: 0.85, marginTop: 4 }}>{t.seizAlertNote}</div>
+        <div style={{
+          marginTop: 10, padding: "12px 14px", borderRadius: 10,
+          background: C.white, border: `2px solid ${C.red}`, color: C.red,
+          display: "flex", gap: 10, alignItems: "flex-start", textAlign: "left",
+        }}>
+          <AlertTriangle size={20} strokeWidth={2.4} style={{ flexShrink: 0, marginTop: 1 }} />
+          <div>
+            <div style={{ fontSize: 14.5, fontWeight: 700, lineHeight: 1.4 }}>{t.seizAlert}</div>
+            <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>{t.seizAlertNote}</div>
+          </div>
         </div>
       )}
       <PrimaryBtn color={alert ? C.red : C.plum} onClick={onEnd} style={{ marginTop: 12 }}>
@@ -1955,7 +1982,7 @@ function SettingsSheet({ data, update, onReset, onClose, onFeedback, onBackup, o
 function BreatheSheet({ data, update, t, onClose }) {
   return (
     <Sheet title={t.breathe} onClose={onClose} t={t}>
-      <CalmView data={data} update={update} t={t} />
+      <CalmView data={data} update={update} t={t} onClose={onClose} />
     </Sheet>
   );
 }
@@ -2149,8 +2176,8 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 2 }}>
-            <button className="press" onClick={() => setShowReport(true)} aria-label={t.report} style={{ padding: 9, borderRadius: 10, color: C.sub }}><FileText size={20} /></button>
-            <button className="press" onClick={() => setShowSettings(true)} aria-label={t.settings} style={{ padding: 9, borderRadius: 10, color: C.sub }}><Cog size={20} /></button>
+            <button className="press" onClick={() => setShowReport(true)} aria-label={t.report} style={iconBtn}><FileText size={20} /></button>
+            <button className="press" onClick={() => setShowSettings(true)} aria-label={t.settings} style={iconBtn}><Cog size={20} /></button>
           </div>
         </header>
         {!storageOk && <div style={{ fontSize: 12, color: C.amber, fontWeight: 600, marginTop: 6 }}>{t.notSaved}</div>}

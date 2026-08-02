@@ -9,7 +9,7 @@
     },
     "SplashScreen": {
       "launchAutoHide": false,
-      "backgroundColor": "#F0EEE5",
+      "backgroundColor": "#EDF1F2",
       "androidScaleType": "CENTER_CROP",
       "showSpinner": false,
       "androidSpinnerStyle": "small",
@@ -21,7 +21,7 @@
       "resizeOnFullScreen": true
     }
   },
-  "backgroundColor": "#F0EEE5",
+  "backgroundColor": "#EDF1F2",
   "android": {
     "adjustMarginsForEdgeToEdge": "auto"
   }
