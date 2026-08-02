@@ -6,7 +6,7 @@ export const isNative = () => Capacitor.isNativePlatform();
 const isAndroid = () => Capacitor.getPlatform() === "android";
 
 export const FOLLOWUP_MIN = 30;
-const BACKUP_ID = 1900000001;   // už doseKey/followKey hash'ų ribų
+const BACKUP_ID = 2000000001;   // notifId grąžina 0…1999999999, tad čia susidūrimas neįmanomas
 const HORIZON_DAYS = 14;
 const MAX_PENDING = 400;   // Android riba ~500 vienai programėlei; laikom atsargą
 
@@ -28,10 +28,19 @@ export async function pendingCount() {
   catch (e) { return null; }
 }
 
-export async function cancelAll() {
+/**
+ * Atšaukia VAISTŲ priminimus, bet ne svetimus ID.
+ *
+ * Anksčiau čia buvo `cancel(pending)` be filtro, todėl kartu dingdavo ir mėnesinis
+ * kopijos priminimas. `syncMedReminders` perplanuoja ir grįžus iš fono (`dayTick`),
+ * o `syncBackupReminder` tada nesuveikia — priminimas apie kopiją būdavo ištrinamas
+ * po pirmo programėlės minimizavimo ir nebeatsistatydavo.
+ */
+export async function cancelAll(keepIds = [BACKUP_ID]) {
   if (!isNative()) return;
   const pending = await LocalNotifications.getPending();
-  if (pending.notifications.length) await LocalNotifications.cancel(pending);
+  const mine = pending.notifications.filter((n) => !keepIds.includes(n.id));
+  if (mine.length) await LocalNotifications.cancel({ notifications: mine });
 }
 
 /**

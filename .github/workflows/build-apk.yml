@@ -59,6 +59,12 @@ jobs:
           print(x)
           PY
 
+      # Be šito APK gautų numatytąją Capacitor piktogramą: assets/ katalogas pats
+      # savaime niekur nepatenka. Įrankis ieško būtent icon-only / icon-foreground /
+      # icon-background / splash / splash-dark vardų.
+      - name: Generate launcher icons and splash
+        run: npx @capacitor/assets generate --android
+
       - name: Install notification icons
         run: |
           set -e
@@ -69,6 +75,34 @@ jobs:
             cp "assets/ic_stat_aura_${M[$d]}.png" "$dir/ic_stat_aura.png"
           done
           ls -R android/app/src/main/res/drawable-*dpi
+
+      # Android 13+ temuota piktograma. @capacitor/assets jos negeneruoja, o
+      # <monochrome> įrašo į ic_launcher.xml nėra – be jo sluoksnis būtų ignoruotas.
+      - name: Install monochrome (themed) icon
+        run: |
+          set -e
+          for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            dir="android/app/src/main/res/mipmap-$d"
+            mkdir -p "$dir"
+            cp "assets/ic_launcher_monochrome_$d.png" "$dir/ic_launcher_monochrome.png"
+          done
+          python3 - <<'PY'
+          import pathlib, re
+          added = []
+          for name in ("ic_launcher.xml", "ic_launcher_round.xml"):
+              p = pathlib.Path("android/app/src/main/res/mipmap-anydpi-v26") / name
+              if not p.exists():
+                  continue
+              x = p.read_text(encoding="utf-8")
+              if "monochrome" in x:
+                  continue
+              x = x.replace("</adaptive-icon>",
+                            '    <monochrome android:drawable="@mipmap/ic_launcher_monochrome"/>\n</adaptive-icon>')
+              p.write_text(x, encoding="utf-8")
+              added.append(name)
+              print(x)
+          print("papildyta:", added or "nieko")
+          PY
 
       - name: Assemble debug APK
         working-directory: android
