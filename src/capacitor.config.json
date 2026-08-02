@@ -1,0 +1,28 @@
+{
+  "appId": "lt.aura.epilepsy",
+  "appName": "Aura",
+  "webDir": "dist",
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_aura",
+      "iconColor": "#D97757"
+    },
+    "SplashScreen": {
+      "launchAutoHide": false,
+      "backgroundColor": "#EDF1F2",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "androidSpinnerStyle": "small",
+      "splashFullScreen": false,
+      "splashImmersive": false
+    },
+    "Keyboard": {
+      "resize": "native",
+      "resizeOnFullScreen": true
+    }
+  },
+  "backgroundColor": "#EDF1F2",
+  "android": {
+    "adjustMarginsForEdgeToEdge": "auto"
+  }
+}
