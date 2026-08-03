@@ -3,26 +3,64 @@ import { load as loadData, save as saveData, clear as clearData } from "./storag
 import { syncMedReminders, initChannel, permissionState, requestPermission, isNative,
          cancelDose, restoreDose, pendingCount, FOLLOWUP_MIN } from "./notifications";
 import { pad, dkey, todayKey, addDays } from "./dates";
-import { syncBackupReminder } from "./notifications";
+import { syncBackupReminder, syncBedtimeReminder } from "./notifications";
 import { exportBackup, validateBackup, restoreBackup } from "./backup";
 import { startTimer, loadTimer, clearTimer, elapsedSec, isStale, fmtDuration, bucketOf, ALERT_SEC } from "./seizureTimer";
-import { hideSplash, initStatusBar, onBackButton, onResume, exitApp } from "./native";
+import { hideSplash, initStatusBar, setNativeTheme, onBackButton, onResume, exitApp } from "./native";
 import { Pill, Zap, Activity, NotebookPen, Plus, X, Check, Trash2, Minus, Wind, CalendarDays, ChevronLeft, ChevronRight, Play, Square, FileText, Settings as Cog, Pencil, Pause, AlertTriangle } from "lucide-react";
 
 // ---------- design tokens: Claude-style ----------
-const C = {
-  // Paletė sąmoningai atitraukta nuo raudonos-oranžinės zonos: perėjimas į sotų raudoną
-  // laikomas rizikos veiksniu net statiniame vaizde, o akcentas kartojasi visame ekrane.
-  bg: "#EDF1F2", card: "#FFFFFF", white: "#FFFFFF",
-  ink: "#1B2A31",          // gilus skalūnas, ne juoda – mažesnis šviesumo skirtumas
-  sub: "#546A76", line: "#D8E1E4",
-  clay: "#1F6E6B", claySoft: "#E1EDEC", clayDark: "#175856",   // pagrindinis: petrolinis
-  blue: "#4C5A8F", blueSoft: "#E7E9F3",
-  sage: "#3F7A57", sageSoft: "#E3EDE6",
-  amber: "#8A6520", amberSoft: "#F1E9D8",
-  plum: "#4C5A8F", plumSoft: "#E7E9F3",   // priepuoliai: indigo, ne slyvinė
-  red: "#96504A", redSoft: "#F2E6E4",     // tik kraštinei ir tekstui, niekada dideliam plotui
+/**
+ * Dvi paletės. Abi atitrauktos nuo raudonos-oranžinės zonos: perėjimas į sotų
+ * raudoną laikomas rizikos veiksniu net statiniame vaizde, o akcentas kartojasi
+ * visame ekrane.
+ *
+ * `white` yra paviršiaus, o ne baltumo žyma — devyniose vietose ja dengiami
+ * laukeliai ir kortelės, todėl tamsioje temoje ji privalo patamsėti. Tikro balto
+ * reikia tik apvedimo žiedui, ir ten įrašytas literalas.
+ */
+const PALETTE = {
+  light: {
+    bg: "#EDF1F2", card: "#FFFFFF", white: "#FFFFFF", onAccent: "#FFFFFF",
+    ink: "#1B2A31",          // gilus skalūnas, ne juoda – mažesnis šviesumo skirtumas
+    sub: "#546A76", line: "#D8E1E4",
+    clay: "#1F6E6B", claySoft: "#E1EDEC", clayDark: "#175856",   // pagrindinis: petrolinis
+    blue: "#4C5A8F", blueSoft: "#E7E9F3",
+    sage: "#3F7A57", sageSoft: "#E3EDE6",
+    amber: "#8A6520", amberSoft: "#F1E9D8",
+    plum: "#4C5A8F", plumSoft: "#E7E9F3",   // priepuoliai: indigo, ne slyvinė
+    red: "#96504A", redSoft: "#F2E6E4",     // tik kraštinei ir tekstui, niekada dideliam plotui
+    sh1: "rgba(61,57,41,0.04)", sh2: "rgba(61,57,41,0.12)",
+    sh3: "rgba(61,57,41,0.22)", sh4: "rgba(61,57,41,0.4)",
+  },
+  dark: {
+    // Fonas nėra grynai juodas: baltas tekstas ant juodo duoda halo efektą, o
+    // pilnas kontrastas naktį yra nepatogus tam, dėl ko ši tema apskritai daroma.
+    bg: "#131B20", card: "#1B252B", white: "#1B252B", onAccent: "#0E1418",
+    ink: "#E4EBEE", sub: "#9DB0B9", line: "#2C3A42",
+    // akcentai pašviesinti: tamsiame fone tas pats petrolinis nebeįskaitomas
+    clay: "#5FB3AE", claySoft: "#17332F", clayDark: "#8AD0CB",
+    blue: "#94A3D6", blueSoft: "#232942",
+    sage: "#74B48C", sageSoft: "#1B2E22",
+    amber: "#D2AC66", amberSoft: "#33291A",
+    plum: "#94A3D6", plumSoft: "#232942",
+    red: "#D08C86", redSoft: "#33211F",
+    sh1: "rgba(0,0,0,0.25)", sh2: "rgba(0,0,0,0.45)",
+    sh3: "rgba(0,0,0,0.6)", sh4: "rgba(0,0,0,0.7)",
+  },
 };
+
+/**
+ * Kiekvienas raktas virsta `var(--c-*)`. Taip 272 spalvų panaudojimai lieka
+ * nepaliesti, o tema keičiasi vienu atributu ant <html>.
+ *
+ * Kaina: šios reikšmės tinka tik CSS kontekste. SVG `stroke=`/`fill=` atributai
+ * var() nepriima, todėl ten spalva paduodama per `style`, o native API (status
+ * bar, theme-color) gauna tikrą HEX iš PALETTE.
+ */
+const C = Object.fromEntries(Object.keys(PALETTE.light).map((k) => [k, `var(--c-${k})`]));
+
+const THEME_VARS = (p) => Object.entries(p).map(([k, v]) => `--c-${k}:${v}`).join(";");
 
 const T = {
   serif: "'Literata Variable', Georgia, serif",
@@ -30,6 +68,14 @@ const T = {
 };
 
 const GLOBAL_CSS = `
+/* Tema keičiama data-theme atributu ant <html>. „auto“ paklūsta telefono temai,
+   „light“ ir „dark“ ją nustelbia – todėl sistemos užklausa taikoma tik auto. */
+:root { ${THEME_VARS(PALETTE.light)} }
+:root[data-theme="dark"] { ${THEME_VARS(PALETTE.dark)} }
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] { ${THEME_VARS(PALETTE.dark)} }
+}
+html, body { background: var(--c-bg); }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 body { margin: 0; }
 button { cursor: pointer; border: none; background: none; padding: 0; }
@@ -96,7 +142,7 @@ const STR = {
     rNote: "Vaistų laikymasis skaičiuojamas pagal dabartinį vaistų sąrašą, todėl laikotarpiui iki vaisto pridėjimo — apytikslis.",
     rTitle: (n) => `AURA — ${n} d. ataskaita`, rPatient: "Pacientas", rFooter: "Duomenys registruoti paties paciento programėle Aura.",
     rAdhLine: (p, t, s) => `VAISTAI: laikymasis ~${p}% (${t} iš ${s} dozių)`,
-    settings: "Nustatymai", language: "Kalba", profile: "Profilis", namePh: "Vardas (rodomas ataskaitoje)",
+    setupIntro: "Kelios sekundės, ir galim pradėti. Visa tai vėliau pakeisi Nustatymuose.", setupName: "Kaip į tave kreiptis?", setupNameHint: "Neprivaloma. Vardas rodomas tik ataskaitoje gydytojui.", setupNotify: "Vaistų priminimai", setupNotifyDesc: "Priminsim išgerti dozę tavo nurodytu laiku. Galima įjungti ir vėliau.", setupStart: "Pradėti", setupLocal: "Paskyros nėra. Viskas lieka šiame telefone.", settings: "Nustatymai", language: "Kalba", replayTour: "Peržiūrėti apžvalgą", theme: "Išvaizda", bed: "Miego priminimas", bedDesc: "Priminsim ruoštis miegoti tavo pasirinktu laiku.", thLight: "Šviesi", thDark: "Tamsi", thAuto: "Automatinė", profile: "Profilis", namePh: "Vardas (rodomas ataskaitoje)",
     overdueAfter: "Dozė žymima „praleista?“ po:", data: "Duomenys", exportJson: "Eksportuoti duomenis (JSON)",
     deleteAll: "Ištrinti visus duomenis", confirmAll: "Tikrai ištrinti viską? Negrįžtama", about: "Apie",
     aboutText: "Aura · prototipas v1.4. Duomenys saugomi tik šiame telefone. Programėlė nėra medicinos prietaisas — priepuolių detekcijai naudok sertifikuotus įrenginius, o skubiai informacijai užsipildyk telefono Medical ID.",
@@ -138,24 +184,18 @@ const STR = {
     breathe: "Kvėpavimas", breatheNote: "Atsipalaidavimo pratimas.", close: "Uždaryti", trigOtherPh: "Įrašyk savo žodžiais",
     fbCardText: "Aura — mano asmeninis projektas, kuriamas laisvalaikiu. Jei kažko trūksta arba kažkas veikia blogai, parašyk — tai vienintelis būdas man sužinoti.",
     fbCardYes: "Parašyti", fbCardNo: "Ne dabar",
-    guide: "Kaip naudotis", guideIntro: "Trumpai apie tai, kas nėra akivaizdu iš pirmo žvilgsnio.",
-    gShow: "Parodyti, kur tai yra", gShowHint: "Palietus bet kur — uždaroma.",
     // Pirmo paleidimo apžvalga: po vieną eilutę. Ilgesnis tekstas čia neskaitomas —
     // žmogus ką tik atsidarė programėlę ir dar nežino, ar jam jos reikia.
     tourNext: "Toliau", tourDone: "Pradėti", tourSkip: "Praleisti",
     tour1: "Laikmatis matuoja pats — trukmės rašyti nereikia.",
     tour2: "Pajutai aurą? Pažymėk čia.",
     tour3: "Pridėk vaistus — priminsim laiku.",
-    tour4: "Kalendorius, būsena ir užrašai.",
-    tour5: "30 dienų suvestinė gydytojui. Dėl jos viskas ir renkama.",
-    gSeiz: "Priepuolio registravimas", gSeizB: "Paspausk „Prasidėjo priepuolis“ — trukmė matuojama pati, jos vesti nereikia. Laikmatis veikia ir uždarius programėlę ar telefonui persikrovus. Ties 5 min ekranas parausta ir įspėja; programėlė neskambina pati, skambinti reikia tau arba šalia esančiam žmogui. Paspaudus „Priepuolis baigėsi“ atsidaro forma su jau įrašyta pradžia ir trukme — visa kita pildyti nebūtina.",
-    gAura: "Aura", gAuraB: "„Jaučiu aurą“ užfiksuoja laiką ir atidaro kvėpavimo pratimą atsipalaidavimui. Jei per valandą po auros užregistruosi priepuolį, aura ir priepuolis bus susieti automatiškai.",
-    gMeds: "Vaistai ir priminimai", gMedsB: "Pridėk vaistą su vartojimo laikais ir pažymėk kiekvieną dozę paspaudimu. Nepažymėjus, po 30 min ateis vienas pakartojimas. Kad priminimai ateitų laiku, telefono nustatymuose leisk Aurai veikti be baterijos apribojimų — „Netrukdyti“ režimas juos vis tiek nutildo.",
-    gReport: "Ataskaita gydytojui", gReportB: "Tai pagrindinė priežastis vesti dienyną. Programėlė iš įrašų suskaičiuoja vaistų laikymosi procentą, trigerius pagal dažnį ir miegą prieš priepuolius. Ataskaitą galima nukopijuoti tekstu ir nusiųsti gydytojui.",
-    gBackup: "Atsarginė kopija", gBackupB: "Duomenys saugomi tik šiame telefone — debesyje jų nėra. Pametus ar sugadinus telefoną kopija yra vienintelis kelias atgauti dienyną. Pasidaryk ją kas mėnesį ir išsisaugok sau į el. paštą arba Drive.",
+    tour4: "Visi priepuoliai vienoje vietoje.",
+    tour5: "Kalendorius — visas mėnuo iš karto.",
+    tour6: "Būsena: miegas, stresas, nuovargis.",
+    tour7: "Užrašai — kas netelpa niekur kitur.",
+    tour8: "30 dienų suvestinė gydytojui. Dėl jos viskas ir renkama.",
     gNotif: "Priminimai neateina laiku", gNotifB: "Priminimai atiduodami telefono žadintuvų sistemai iki 14 dienų į priekį, todėl Aurai veikti nereikia. Jei žinutė pasirodo tik tada, kai atidarai programėlę, ją stabdo telefono energijos taupymas. Griežčiausi čia yra Xiaomi, Huawei, Samsung ir OnePlus.\n\nPirmiausia patikrink, ar priminimai apskritai suplanuoti: Nustatymai → Suplanuota priminimų → Tikrinti. Jei rodo 0, telefonas juos panaikino. Jei rodo didelį skaičių, o žinutė vis tiek vėluoja — priminimai sukurti teisingai, tik telefonas neleidžia jų parodyti.\n\nAbiem atvejais padeda tie patys nustatymai. Pavadinimai priklauso nuo telefono, bet keliai panašūs:\n\n1. Baterijos taupymas → Be apribojimų. Nustatymai → Programos → Programų tvarkyklė → Aura → Baterijos taupymas. Tai svarbiausias žingsnis — kol čia lieka taupymo režimas, telefonas stabdo priminimus, kad ir ką pakeistum kitur.\n\n2. Automatinis paleidimas (Autostart) — įjungti. Toje pačioje Auros kortelėje. Xiaomi jį išjungia pagal nutylėjimą.\n\n3. Paskutinių programėlių ekrane užrakink Aurą spynele. Kitaip „Išvalyti viską“ panaikina visus suplanuotus priminimus.\n\n4. Žadintuvai ir priminimai — leisti. Nustatymai → Programos → Speciali prieiga.\n\nPakeitęs palik telefoną kelioms valandoms ir pažiūrėk, ar priminimas ateina laiku pats.",
-    gPrivacy: "Privatumas", gPrivacyB: "Įrašai niekada neišeina iš telefono: nėra paskyros, serverio ir jokių tinklo užklausų. Atsiliepimą siunčiant prisegama tik programėlės versija ir įrenginio tipas, dienyno turinys — ne.",
-    gDisc: "Aura nėra medicinos prietaisas ir nekeičia gydytojo. Priepuolių aptikimui skirti sertifikuoti įrenginiai, o skubiai informacijai užrakintame ekrane užsipildyk telefono Medical ID.",
     change: "Keisti pratimą",
     ty: { tonicClonic: "Toninis-kloninis", absence: "Absansas", focal: "Židininis", myoclonic: "Miokloninis", other: "Kitas", unspec: "Nenurodyta" },
     ef: { fall: "Nukritau", injury: "Susižalojau", tongue: "Prikandau liežuvį", incontinence: "Šlapimo nelaikymas" },
@@ -199,7 +239,7 @@ const STR = {
     rNote: "Adherence is calculated from your current medication list, so it is approximate for periods before a medication was added.",
     rTitle: (n) => `AURA — ${n}-day report`, rPatient: "Patient", rFooter: "Data self-recorded by the patient using the Aura app.",
     rAdhLine: (p, t, s) => `MEDICATION: adherence ~${p}% (${t} of ${s} doses)`,
-    settings: "Settings", language: "Language", profile: "Profile", namePh: "Name (shown in the report)",
+    setupIntro: "A few seconds and we can begin. All of this can be changed later in Settings.", setupName: "What should we call you?", setupNameHint: "Optional. The name appears only in the doctor’s report.", setupNotify: "Medication reminders", setupNotifyDesc: "We will remind you to take a dose at the times you enter. You can turn this on later too.", setupStart: "Get started", setupLocal: "There is no account. Everything stays on this phone.", settings: "Settings", language: "Language", replayTour: "Replay the tour", theme: "Appearance", bed: "Bedtime reminder", bedDesc: "A nudge to start winding down at the time you choose.", thLight: "Light", thDark: "Dark", thAuto: "Automatic", profile: "Profile", namePh: "Name (shown in the report)",
     overdueAfter: "Mark a dose as “missed?” after:", data: "Data", exportJson: "Export data (JSON)",
     deleteAll: "Delete all data", confirmAll: "Delete everything? This cannot be undone", about: "About",
     aboutText: "Aura · prototype v1.4. Data is stored only on this phone. This app is not a medical device — use certified devices for seizure detection, and fill in your phone's Medical ID for emergencies.",
@@ -241,22 +281,16 @@ const STR = {
     breathe: "Breathing", breatheNote: "A relaxation exercise.", close: "Close", trigOtherPh: "Describe in your own words",
     fbCardText: "Aura is my personal project, built in my spare time. If something is missing or something works badly, write to me — it is the only way I get to know.",
     fbCardYes: "Write to me", fbCardNo: "Not now",
-    guide: "How to use", guideIntro: "The short version of what is not obvious at first glance.",
-    gShow: "Show me where", gShowHint: "Tap anywhere to close.",
     tourNext: "Next", tourDone: "Start", tourSkip: "Skip",
     tour1: "The timer measures for you — no need to type a duration.",
     tour2: "Feel an aura? Mark it here.",
     tour3: "Add your medications — we'll remind you on time.",
-    tour4: "Calendar, wellbeing and notes.",
-    tour5: "A 30-day summary for your doctor. That is what all of this is for.",
-    gSeiz: "Logging a seizure", gSeizB: "Tap “Seizure started” — the duration is measured for you, there is nothing to type. The timer keeps running if you close the app or the phone restarts. At 5 minutes the screen turns red and warns you; the app does not dial, you or someone nearby has to call. “Seizure ended” opens a form with the start time and duration already filled in — everything else is optional.",
-    gAura: "Aura", gAuraB: "“I feel an aura” records the time and opens a breathing exercise for relaxation. If you log a seizure within an hour of the aura, the aura and the seizure are linked automatically.",
-    gMeds: "Medication and reminders", gMedsB: "Add a medication with its times and mark each dose with a tap. If you do not, one follow-up arrives 30 minutes later. For reminders to arrive on time, allow Aura to run without battery restrictions in your phone settings — Do Not Disturb will still silence them.",
-    gReport: "Report for your doctor", gReportB: "This is the main reason to keep a diary. The app works out your adherence percentage, triggers ranked by frequency and sleep before seizures. You can copy the report as text and send it to your doctor.",
-    gBackup: "Backup", gBackupB: "Your data lives only on this phone — there is no cloud copy. If the phone is lost or broken, a backup is the only way back. Make one monthly and send it to yourself by email or Drive.",
+    tour4: "Every seizure in one place.",
+    tour5: "Calendar — the whole month at once.",
+    tour6: "Wellbeing: sleep, stress, fatigue.",
+    tour7: "Notes — whatever fits nowhere else.",
+    tour8: "A 30-day summary for your doctor. That is what all of this is for.",
     gNotif: "Reminders arrive late", gNotifB: "Reminders are handed to the phone's alarm system up to 14 days ahead, so Aura does not need to be running. If a reminder only appears once you open the app, your phone's battery saver is holding it back. Xiaomi, Huawei, Samsung and OnePlus are the strictest.\n\nFirst check whether reminders were scheduled at all: Settings → Scheduled reminders → Check. If it shows 0, the phone deleted them. If it shows a large number and the reminder is still late, they were scheduled correctly and the phone is simply refusing to show them.\n\nThe same settings help in both cases. Names vary by phone, but the paths are similar:\n\n1. Battery saver → No restrictions. Settings → Apps → Manage apps → Aura → Battery saver. This is the one that matters most — while any saver mode is on, the phone holds reminders back no matter what else you change.\n\n2. Autostart — turn on. In the same Aura entry. Xiaomi disables it by default.\n\n3. Lock Aura in the recent apps screen. Otherwise “Clear all” wipes every scheduled reminder.\n\n4. Alarms & reminders — allow. Settings → Apps → Special app access.\n\nAfter changing these, leave the phone alone for a few hours and see whether a reminder arrives on its own.",
-    gPrivacy: "Privacy", gPrivacyB: "Entries never leave the phone: no account, no server, no network requests at all. Feedback attaches only the app version and device type, never diary content.",
-    gDisc: "Aura is not a medical device and does not replace your doctor. Use certified devices for seizure detection, and fill in your phone's Medical ID for emergency information on the lock screen.",
     change: "Change exercise",
     ty: { tonicClonic: "Tonic-clonic", absence: "Absence", focal: "Focal", myoclonic: "Myoclonic", other: "Other", unspec: "Unspecified" },
     ef: { fall: "I fell", injury: "Injured myself", tongue: "Bit my tongue", incontinence: "Incontinence" },
@@ -300,7 +334,7 @@ const STR = {
     rNote: "Соблюдение приёма считается по текущему списку лекарств, поэтому для периода до добавления лекарства оно приблизительно.",
     rTitle: (n) => `AURA — отчёт за ${n} д.`, rPatient: "Пациент", rFooter: "Данные записаны самим пациентом в приложении Aura.",
     rAdhLine: (p, t, s) => `ЛЕКАРСТВА: соблюдение ~${p}% (${t} из ${s} доз)`,
-    settings: "Настройки", language: "Язык", profile: "Профиль", namePh: "Имя (показывается в отчёте)",
+    setupIntro: "Несколько секунд, и можно начинать. Всё это позже можно изменить в настройках.", setupName: "Как к вам обращаться?", setupNameHint: "Необязательно. Имя показывается только в отчёте врачу.", setupNotify: "Напоминания о лекарствах", setupNotifyDesc: "Напомним принять дозу в указанное вами время. Можно включить и позже.", setupStart: "Начать", setupLocal: "Аккаунта нет. Всё остаётся на этом телефоне.", settings: "Настройки", language: "Язык", replayTour: "Посмотреть обзор снова", theme: "Оформление", bed: "Напоминание о сне", bedDesc: "Напомним готовиться ко сну в выбранное вами время.", thLight: "Светлое", thDark: "Тёмное", thAuto: "Автоматически", profile: "Профиль", namePh: "Имя (показывается в отчёте)",
     overdueAfter: "Отмечать дозу «пропущено?» через:", data: "Данные", exportJson: "Экспорт данных (JSON)",
     deleteAll: "Удалить все данные", confirmAll: "Точно удалить всё? Необратимо", about: "О приложении",
     aboutText: "Aura · прототип v1.4. Данные хранятся только на этом телефоне. Приложение не медицинский прибор — для обнаружения приступов используйте сертифицированные устройства, а для экстренных случаев заполните Medical ID в телефоне.",
@@ -342,22 +376,16 @@ const STR = {
     breathe: "Дыхание", breatheNote: "Упражнение на расслабление.", close: "Закрыть", trigOtherPh: "Опишите своими словами",
     fbCardText: "Aura — мой личный проект, который я делаю в свободное время. Если чего-то не хватает или что-то работает плохо, напишите — это единственный способ мне об этом узнать.",
     fbCardYes: "Написать", fbCardNo: "Не сейчас",
-    guide: "Как пользоваться", guideIntro: "Коротко о том, что не очевидно с первого взгляда.",
-    gShow: "Показать, где это", gShowHint: "Нажмите в любом месте, чтобы закрыть.",
     tourNext: "Далее", tourDone: "Начать", tourSkip: "Пропустить",
     tour1: "Таймер измеряет сам — вводить длительность не нужно.",
     tour2: "Почувствовали ауру? Отметьте здесь.",
     tour3: "Добавьте лекарства — напомним вовремя.",
-    tour4: "Календарь, состояние и заметки.",
-    tour5: "Сводка за 30 дней для врача. Ради неё всё и собирается.",
-    gSeiz: "Запись приступа", gSeizB: "Нажмите «Приступ начался» — длительность измеряется сама, вводить ничего не нужно. Таймер продолжает идти, даже если закрыть приложение или перезагрузить телефон. На 5-й минуте экран краснеет и предупреждает; приложение не звонит само, звонить должны вы или человек рядом. «Приступ закончился» открывает форму с уже заполненным началом и длительностью — остальное по желанию.",
-    gAura: "Аура", gAuraB: "«Чувствую ауру» записывает время и открывает дыхательное упражнение для расслабления. Если в течение часа после ауры записать приступ, аура и приступ свяжутся автоматически.",
-    gMeds: "Лекарства и напоминания", gMedsB: "Добавьте лекарство со временем приёма и отмечайте каждую дозу касанием. Если не отметить, через 30 минут придёт одно повторное напоминание. Чтобы напоминания приходили вовремя, разрешите Aura работать без ограничений батареи — режим «Не беспокоить» всё равно их заглушит.",
-    gReport: "Отчёт для врача", gReportB: "Это главная причина вести дневник. Приложение считает процент соблюдения приёма, триггеры по частоте и сон перед приступами. Отчёт можно скопировать текстом и отправить врачу.",
-    gBackup: "Резервная копия", gBackupB: "Данные хранятся только на этом телефоне — в облаке их нет. При утере или поломке копия — единственный способ вернуть дневник. Делайте её ежемесячно и отправляйте себе на почту или в Drive.",
+    tour4: "Все приступы в одном месте.",
+    tour5: "Календарь — весь месяц сразу.",
+    tour6: "Состояние: сон, стресс, усталость.",
+    tour7: "Заметки — всё, что не подходит в другие разделы.",
+    tour8: "Сводка за 30 дней для врача. Ради неё всё и собирается.",
     gNotif: "Напоминания приходят с опозданием", gNotifB: "Напоминания передаются системе будильников телефона на 14 дней вперёд, поэтому Aura не обязана работать. Если уведомление появляется только когда вы открываете приложение, его задерживает энергосбережение телефона. Строже всего — Xiaomi, Huawei, Samsung и OnePlus.\n\nСначала проверьте, запланированы ли напоминания вообще: Настройки → Запланировано напоминаний → Проверить. Если показывает 0, телефон их удалил. Если показывает большое число, а уведомление всё равно опаздывает — напоминания созданы правильно, телефон просто не даёт их показать.\n\nВ обоих случаях помогают одни и те же настройки. Названия зависят от телефона, но пути похожи:\n\n1. Энергосбережение → Без ограничений. Настройки → Приложения → Все приложения → Aura → Энергосбережение. Это главное — пока включён любой режим экономии, телефон задерживает напоминания, что бы вы ни меняли в других местах.\n\n2. Автозапуск (Autostart) — включить. В той же карточке Aura. Xiaomi отключает его по умолчанию.\n\n3. Закрепите Aura в списке недавних приложений. Иначе «Очистить всё» удаляет все запланированные напоминания.\n\n4. Будильники и напоминания — разрешить. Настройки → Приложения → Специальный доступ.\n\nПосле изменений оставьте телефон на несколько часов и проверьте, придёт ли напоминание само.",
-    gPrivacy: "Приватность", gPrivacyB: "Записи никогда не покидают телефон: нет аккаунта, сервера и сетевых запросов. К отзыву прилагается только версия приложения и тип устройства, содержимое дневника — нет.",
-    gDisc: "Aura не является медицинским прибором и не заменяет врача. Для обнаружения приступов используйте сертифицированные устройства, а для экстренной информации на экране блокировки заполните Medical ID.",
     change: "Изменить упражнение",
     ty: { tonicClonic: "Тонико-клонический", absence: "Абсанс", focal: "Фокальный", myoclonic: "Миоклонический", other: "Другой", unspec: "Не указан" },
     ef: { fall: "Упал(а)", injury: "Травма", tongue: "Прикус языка", incontinence: "Недержание мочи" },
@@ -401,7 +429,7 @@ const STR = {
     rNote: "Przestrzeganie liczone jest na podstawie bieżącej listy leków, więc dla okresu przed dodaniem leku jest przybliżone.",
     rTitle: (n) => `AURA — raport z ${n} dni`, rPatient: "Pacjent", rFooter: "Dane zapisane samodzielnie przez pacjenta w aplikacji Aura.",
     rAdhLine: (p, t, s) => `LEKI: przestrzeganie ~${p}% (${t} z ${s} dawek)`,
-    settings: "Ustawienia", language: "Język", profile: "Profil", namePh: "Imię (widoczne w raporcie)",
+    setupIntro: "Kilka sekund i możemy zacząć. Wszystko to zmienisz później w ustawieniach.", setupName: "Jak się do Ciebie zwracać?", setupNameHint: "Opcjonalne. Imię pojawia się tylko w raporcie dla lekarza.", setupNotify: "Przypomnienia o lekach", setupNotifyDesc: "Przypomnimy o przyjęciu dawki o podanych porach. Można włączyć też później.", setupStart: "Zacznij", setupLocal: "Nie ma konta. Wszystko zostaje na tym telefonie.", settings: "Ustawienia", language: "Język", replayTour: "Obejrzyj przewodnik ponownie", theme: "Wygląd", bed: "Przypomnienie o śnie", bedDesc: "Przypomnimy o przygotowaniu do snu o wybranej porze.", thLight: "Jasny", thDark: "Ciemny", thAuto: "Automatyczny", profile: "Profil", namePh: "Imię (widoczne w raporcie)",
     overdueAfter: "Oznacz dawkę „pominięto?” po:", data: "Dane", exportJson: "Eksportuj dane (JSON)",
     deleteAll: "Usuń wszystkie dane", confirmAll: "Na pewno usunąć wszystko? Nieodwracalne", about: "O aplikacji",
     aboutText: "Aura · prototyp v1.4. Dane są przechowywane tylko na tym telefonie. Aplikacja nie jest wyrobem medycznym — do wykrywania napadów używaj certyfikowanych urządzeń, a na wypadek nagły wypełnij Medical ID w telefonie.",
@@ -443,22 +471,16 @@ const STR = {
     breathe: "Oddech", breatheNote: "Ćwiczenie relaksacyjne.", close: "Zamknij", trigOtherPh: "Opisz własnymi słowami",
     fbCardText: "Aura to mój osobisty projekt, tworzony po godzinach. Jeśli czegoś brakuje albo coś działa źle, napisz — to jedyny sposób, żebym się o tym dowiedział.",
     fbCardYes: "Napisz", fbCardNo: "Nie teraz",
-    guide: "Jak korzystać", guideIntro: "Krótko o tym, co nie jest oczywiste na pierwszy rzut oka.",
-    gShow: "Pokaż, gdzie to jest", gShowHint: "Dotknij w dowolnym miejscu, aby zamknąć.",
     tourNext: "Dalej", tourDone: "Zacznij", tourSkip: "Pomiń",
     tour1: "Stoper mierzy sam — nie trzeba wpisywać czasu.",
     tour2: "Czujesz aurę? Zaznacz tutaj.",
     tour3: "Dodaj leki — przypomnimy na czas.",
-    tour4: "Kalendarz, samopoczucie i notatki.",
-    tour5: "Podsumowanie 30 dni dla lekarza. Po to wszystko jest zbierane.",
-    gSeiz: "Zapisywanie napadu", gSeizB: "Naciśnij „Napad się zaczął” — czas jest mierzony automatycznie, nic nie trzeba wpisywać. Stoper działa nawet po zamknięciu aplikacji lub restarcie telefonu. Po 5 minutach ekran robi się czerwony i ostrzega; aplikacja nie dzwoni sama, zadzwonić musisz Ty lub osoba obok. „Napad się skończył” otwiera formularz z już wpisanym początkiem i czasem trwania — reszta jest opcjonalna.",
-    gAura: "Aura", gAuraB: "„Czuję aurę” zapisuje godzinę i otwiera ćwiczenie oddechowe dla relaksu. Jeśli w ciągu godziny od aury zapiszesz napad, aura i napad zostaną automatycznie powiązane.",
-    gMeds: "Leki i przypomnienia", gMedsB: "Dodaj lek z porami przyjmowania i oznaczaj każdą dawkę dotknięciem. Jeśli tego nie zrobisz, po 30 minutach przyjdzie jedno ponowne przypomnienie. Aby przypomnienia przychodziły na czas, pozwól Aurze działać bez ograniczeń baterii — tryb „Nie przeszkadzać” i tak je wyciszy.",
-    gReport: "Raport dla lekarza", gReportB: "To główny powód prowadzenia dziennika. Aplikacja wylicza procent przestrzegania leczenia, wyzwalacze według częstości i sen przed napadami. Raport można skopiować jako tekst i wysłać lekarzowi.",
-    gBackup: "Kopia zapasowa", gBackupB: "Dane są tylko na tym telefonie — nie ma kopii w chmurze. Po utracie lub awarii telefonu kopia to jedyny sposób odzyskania dziennika. Rób ją co miesiąc i wysyłaj sobie e-mailem lub na Drive.",
+    tour4: "Wszystkie napady w jednym miejscu.",
+    tour5: "Kalendarz — cały miesiąc naraz.",
+    tour6: "Samopoczucie: sen, stres, zmęczenie.",
+    tour7: "Notatki — co nie pasuje nigdzie indziej.",
+    tour8: "Podsumowanie 30 dni dla lekarza. Po to wszystko jest zbierane.",
     gNotif: "Przypomnienia przychodzą z opóźnieniem", gNotifB: "Przypomnienia są przekazywane systemowi alarmów telefonu na 14 dni do przodu, więc Aura nie musi działać. Jeśli powiadomienie pojawia się dopiero po otwarciu aplikacji, wstrzymuje je oszczędzanie energii. Najsurowsze są Xiaomi, Huawei, Samsung i OnePlus.\n\nNajpierw sprawdź, czy przypomnienia w ogóle zostały zaplanowane: Ustawienia → Zaplanowane przypomnienia → Sprawdź. Jeśli pokazuje 0, telefon je usunął. Jeśli pokazuje dużą liczbę, a powiadomienie i tak się spóźnia — przypomnienia są poprawne, telefon po prostu nie pozwala ich pokazać.\n\nW obu przypadkach pomagają te same ustawienia. Nazwy zależą od telefonu, ale ścieżki są podobne:\n\n1. Oszczędzanie baterii → Bez ograniczeń. Ustawienia → Aplikacje → Zarządzaj aplikacjami → Aura → Oszczędzanie baterii. To najważniejszy krok — dopóki działa jakikolwiek tryb oszczędzania, telefon wstrzymuje przypomnienia, cokolwiek zmienisz gdzie indziej.\n\n2. Autostart — włącz. W tym samym wpisie Aura. Xiaomi wyłącza go domyślnie.\n\n3. Zablokuj Aurę na ekranie ostatnich aplikacji. Inaczej „Wyczyść wszystko” kasuje wszystkie zaplanowane przypomnienia.\n\n4. Alarmy i przypomnienia — zezwól. Ustawienia → Aplikacje → Specjalny dostęp.\n\nPo zmianach zostaw telefon na kilka godzin i sprawdź, czy przypomnienie przyjdzie samo.",
-    gPrivacy: "Prywatność", gPrivacyB: "Wpisy nigdy nie opuszczają telefonu: brak konta, serwera i jakichkolwiek zapytań sieciowych. Do opinii dołączana jest tylko wersja aplikacji i typ urządzenia, nigdy treść dziennika.",
-    gDisc: "Aura nie jest wyrobem medycznym i nie zastępuje lekarza. Do wykrywania napadów używaj certyfikowanych urządzeń, a na wypadek nagły wypełnij Medical ID w telefonie.",
     change: "Zmień ćwiczenie",
     ty: { tonicClonic: "Toniczno-kloniczny", absence: "Napad nieświadomości", focal: "Ogniskowy", myoclonic: "Miokloniczny", other: "Inny", unspec: "Nieokreślony" },
     ef: { fall: "Upadek", injury: "Uraz", tongue: "Przygryzienie języka", incontinence: "Nietrzymanie moczu" },
@@ -476,6 +498,7 @@ const NOTIF = {
     fuTitle: "Dozė nepažymėta", fuBody: (m) => `${m.name} — ar tikrai išgėrei?`,
     channel: "Vaistų priminimai", label: "Priminimai",
     bkTitle: "Pasidaryk atsarginę kopiją", bkBody: "Dienyno duomenys saugomi tik šiame telefone.", bkChannel: "Kopijos priminimai",
+    bedTitle: "Metas ruoštis miegoti", bedBody: "Šį laiką nusistatei pats.", bedChannel: "Miego priminimas",
     diag: "Suplanuota priminimų", diagRun: "Tikrinti", diagNone: "nėra", diagHelp: "Priminimai neateina laiku?",
     desc: "Kasdieniai pranešimai pagal vaistų vartojimo laikus.",
     on: "Įjungti", off: "Išjungti",
@@ -487,6 +510,7 @@ const NOTIF = {
     fuTitle: "Dose not marked", fuBody: (m) => `${m.name} — did you actually take it?`,
     channel: "Medication reminders", label: "Reminders",
     bkTitle: "Time to back up", bkBody: "Your diary is stored only on this phone.", bkChannel: "Backup reminders",
+    bedTitle: "Time to get ready for bed", bedBody: "You set this time yourself.", bedChannel: "Bedtime reminder",
     diag: "Scheduled reminders", diagRun: "Check", diagNone: "none", diagHelp: "Reminders arriving late?",
     desc: "Daily notifications based on your dose times.",
     on: "On", off: "Off",
@@ -498,6 +522,7 @@ const NOTIF = {
     fuTitle: "Доза не отмечена", fuBody: (m) => `${m.name} — вы действительно приняли?`,
     channel: "Напоминания о лекарствах", label: "Напоминания",
     bkTitle: "Сделайте резервную копию", bkBody: "Дневник хранится только на этом телефоне.", bkChannel: "Напоминания о копиях",
+    bedTitle: "Пора готовиться ко сну", bedBody: "Это время вы выбрали сами.", bedChannel: "Напоминание о сне",
     diag: "Запланировано напоминаний", diagRun: "Проверить", diagNone: "нет", diagHelp: "Напоминания опаздывают?",
     desc: "Ежедневные уведомления по времени приёма.",
     on: "Вкл.", off: "Выкл.",
@@ -509,6 +534,7 @@ const NOTIF = {
     fuTitle: "Dawka nieoznaczona", fuBody: (m) => `${m.name} — czy naprawdę wziąłeś?`,
     channel: "Przypomnienia o lekach", label: "Przypomnienia",
     bkTitle: "Zrób kopię zapasową", bkBody: "Dziennik jest przechowywany tylko na tym telefonie.", bkChannel: "Przypomnienia o kopiach",
+    bedTitle: "Czas przygotować się do snu", bedBody: "Ten czas ustawiłeś samodzielnie.", bedChannel: "Przypomnienie o śnie",
     diag: "Zaplanowane przypomnienia", diagRun: "Sprawdź", diagNone: "brak", diagHelp: "Przypomnienia się spóźniają?",
     desc: "Codzienne powiadomienia według pór przyjmowania.",
     on: "Wł.", off: "Wył.",
@@ -558,38 +584,40 @@ const medIds = (data) => new Set(data.meds.map((m) => m.id));
 // paverstų visą praėjusį mėnesį „0 %“, o laikų pakeitimas nubrauktų procentą be priežasties.
 const scheduledOn = (meds, dk) => meds.reduce((a, m) => a + ((m.timesFrom || "0000-00-00") <= dk ? m.times.length : 0), 0);
 
-// ---------- Claude starburst logo ----------
+// ---------- ženklas ----------
 /**
- * Aura ženklas: EEG ramybės būsenos kreivė — slopstanti sinusoidė
- * `sin(3πu)·(1−0.62u)`, u ∈ [0, 1]. Pusantro ciklo mažėjančia amplitude.
+ * Šešialapė forma: r(θ) = R·(1 + 0,22·cos(6θ)), piešiama storu kontūru.
  *
- * Slopimas čia turiningas, ne dekoratyvus: kreivė nurimsta, o ne įsisiūbuoja.
- * Augančios amplitudės kreivė vaizduotų priepuolio pradžią, o dienynas priepuolių
- * negydo ir tokio pažado ant savęs nešioti negali.
+ * Uždara ir radialiai simetriška sąmoningai: kvadratinėje ir apvalioje Android
+ * kaukėje ji užpildo plotą tolygiai. Ankstesnė EEG kreivė buvo plati ir žema,
+ * todėl apskritime viršuje ir apačioje likdavo tuščia.
  *
- * Vientisa linija be atšakų sąmoningai: ankstesnis šakotas variantas ties mažais
- * dydžiais suliedavo šakas į dėmę. `simple` skiriasi tik storiu ir pločiu —
- * pačios formos keisti nereikia, ji išlieka įskaitoma ir ties 24 px.
+ * `simple` tik sustorina kontūrą ir šiek tiek sutraukia formą — pranešimų
+ * piktogramoje ties 24 px plonas kontūras subyra.
+ *
+ * Ta pati formulė gyvena tools/make-icons.mjs. Pakeitus čia, reikia paleisti
+ * `npm run icons`, kitaip sąsaja ir piktograma prasilenks.
  */
 function AuraMark({ size = 30, color = C.clay, simple = false }) {
-  const N = 72;
-  const W = simple ? 12.4 : 13.2;      // pusė kreivės pločio
-  const A = simple ? 9.4 : 10.4;       // amplitudės mastelis
-  // Kreivė nesimetriška vertikaliai (viršūnė +0,90, dugnas −0,69), todėl centruojam
-  // pagal tikras kraštines reikšmes, o ne pagal nulinę liniją.
-  const SHIFT = A * (0.897 - 0.690) / 2;
+  const K = 6, A = 0.22;
+  // R parinktas taip, kad kraštinė viršūnė su puse brūkšnio dar tilptų į 16:
+  // R·(1+A) + R·sw/2 ≤ 16. Peržengus, formos smaigaliai nusikirstų.
+  const R = simple ? 11.7 : 12.0;
+  const sw = R * (simple ? 0.26 : 0.20);
+  const steps = 240;
 
-  const d = Array.from({ length: N + 1 }, (_, i) => {
-    const u = i / N;
-    const x = -W + 2 * W * u;
-    const y = -A * Math.sin(3 * Math.PI * u) * (1 - 0.62 * u) + SHIFT;
-    return `${i ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)}`;
-  }).join(" ");
+  let d = "";
+  for (let i = 0; i <= steps; i++) {
+    const th = (i / steps) * Math.PI * 2;
+    const r = R * (1 + A * Math.cos(K * th));
+    d += `${i ? "L" : "M"}${(Math.cos(th) * r).toFixed(2)} ${(Math.sin(th) * r).toFixed(2)} `;
+  }
 
   return (
     <svg viewBox="-16 -16 32 32" width={size} height={size} aria-hidden="true">
-      <path d={d} fill="none" stroke={color} strokeWidth={simple ? 3.5 : 2.9}
-        strokeLinecap="round" strokeLinejoin="round" />
+      {/* stroke per style: reikšmė yra var(--c-clay), o atributuose var() neveikia */}
+      <path d={`${d.trim()} Z`} fill="none" strokeWidth={sw.toFixed(2)}
+        strokeLinejoin="round" style={{ stroke: color }} />
     </svg>
   );
 }
@@ -600,7 +628,7 @@ function SectionLabel({ children, style }) {
 }
 
 function Card({ children, style }) {
-  return <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, boxShadow: "0 1px 2px rgba(61,57,41,0.04)", ...style }}>{children}</div>;
+  return <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, boxShadow: `0 1px 2px ${C.sh1}`, ...style }}>{children}</div>;
 }
 
 function Chip({ active, onClick, children, color = C.clay, soft = C.claySoft }) {
@@ -659,8 +687,8 @@ function DeleteBtn({ onConfirm, t }) {
 function Sheet({ title, onClose, children, t }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(61,57,41,0.4)" }} />
-      <div style={{ position: "relative", width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", background: C.bg, borderRadius: "18px 18px 0 0", padding: "18px 18px 28px", boxShadow: "0 -4px 24px rgba(61,57,41,0.12)" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: C.sh4 }} />
+      <div style={{ position: "relative", width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", background: C.bg, borderRadius: "18px 18px 0 0", padding: "18px 18px 28px", boxShadow: `0 -4px 24px ${C.sh2}` }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div style={{ fontFamily: T.serif, fontSize: 20, fontWeight: 600 }}>{title}</div>
           <button onClick={onClose} aria-label={t.close} style={iconBtn}><X size={20} /></button>
@@ -675,7 +703,7 @@ function PrimaryBtn({ onClick, children, disabled, color = C.clay, style, tour }
   return (
     <button className="press" onClick={onClick} disabled={disabled} data-tour={tour} style={{
       width: "100%", padding: "13px 16px", borderRadius: 12, fontFamily: T.body, fontSize: 15, fontWeight: 600,
-      background: disabled ? C.line : color, color: disabled ? C.sub : "#FFF",
+      background: disabled ? C.line : color, color: disabled ? C.sub : C.onAccent,
       transition: "transform 80ms ease, background 120ms ease", ...style,
     }}>{children}</button>
   );
@@ -694,7 +722,7 @@ const inputStyle = { width: "100%", padding: "11px 14px", borderRadius: 10, bord
  * Tuščioje būsenoje rodomas PAVYZDYS, aiškiai pažymėtas: neturi atrodyti kaip
  * tikri duomenys, bet turi parodyti, kas čia bus.
  */
-function SummaryStrip({ data, t, onOpen, onGuide }) {
+function SummaryStrip({ data, t, onOpen }) {
   const hasData = data.meds.length || data.seizures.length || Object.keys(data.daily).length;
   const r = useMemo(() => (hasData ? buildReport(data, 30, t) : null), [data, t, hasData]);
 
@@ -734,10 +762,6 @@ function SummaryStrip({ data, t, onOpen, onGuide }) {
         <>
           <div style={{ fontSize: 12, color: C.amber, fontWeight: 600, marginTop: 10 }}>{t.sumDemo}</div>
           <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.5, marginTop: 6 }}>{t.sumWhy}</div>
-          <button className="press" onClick={onGuide}
-            style={{ fontSize: 13, fontWeight: 600, color: C.clay, marginTop: 10, padding: "2px 0" }}>
-            {t.guide} →
-          </button>
         </>
       )}
     </Card>
@@ -809,7 +833,7 @@ function DoseRow({ time, takenAt, overdue, onToggle, t }) {
       <div style={{
         width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
         border: `1.5px solid ${taken ? C.clay : overdue ? C.amber : C.line}`,
-        background: taken ? C.clay : "transparent", color: "#FFF",
+        background: taken ? C.clay : "transparent", color: C.onAccent,
         display: "flex", alignItems: "center", justifyContent: "center",
       }}>
         {taken && <Check size={20} strokeWidth={3} />}
@@ -818,7 +842,7 @@ function DoseRow({ time, takenAt, overdue, onToggle, t }) {
   );
 }
 
-function MedsView({ data, update, t, lc, onReport, timer, onStartTimer, onEndTimer, onDiscardTimer, onAura, auraMsg, fbCard, onGuide }) {
+function MedsView({ data, update, t, lc, onReport, timer, onStartTimer, onEndTimer, onDiscardTimer, onAura, auraMsg, fbCard }) {
   const [editing, setEditing] = useState(undefined);
   const tk = todayKey();
   const log = data.doseLog[tk] || {};
@@ -864,7 +888,7 @@ function MedsView({ data, update, t, lc, onReport, timer, onStartTimer, onEndTim
         </>
       )}
       {fbCard}
-      <SummaryStrip data={data} t={t} onOpen={onReport} onGuide={onGuide} />
+      <SummaryStrip data={data} t={t} onOpen={onReport} />
       <SectionLabel>{t.todayIs} · {fLong(now, lc)}</SectionLabel>
       {data.meds.length === 0 && (
         <Card style={{ textAlign: "center", padding: 28 }}>
@@ -927,7 +951,7 @@ function MedsView({ data, update, t, lc, onReport, timer, onStartTimer, onEndTim
                       height: 36, borderRadius: 10, background: full ? C.clay : some ? C.amberSoft : C.white,
                       border: `1px solid ${full ? C.clay : some ? C.amber : C.line}`,
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      color: full ? "#FFF" : some ? C.amber : C.line, fontSize: 12, fontWeight: 600,
+                      color: full ? C.onAccent : some ? C.amber : C.line, fontSize: 12, fontWeight: 600,
                     }}>
                       {full ? <Check size={15} strokeWidth={2.8} /> : some ? taken : "·"}
                     </div>
@@ -1027,7 +1051,7 @@ function SeizureForm({ initial, measured, recentAura, onSave, onClose, t, auraTy
                   if (id) setKinds([...kinds, id]);
                   setNewKind("");
                 }}
-                style={{ width: 44, borderRadius: 10, background: newKind.trim() ? C.plum : C.line, color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                style={{ width: 44, borderRadius: 10, background: newKind.trim() ? C.plum : C.line, color: C.onAccent, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Plus size={20} />
               </button>
             </div>
@@ -1362,10 +1386,11 @@ function CalmView({ data, update, t, onClose }) {
       <div style={{ position: "relative", width: 220, height: 220, display: "flex", alignItems: "center", justifyContent: "center", marginTop: 6 }}>
         {/* eigos žiedas – be mirgėjimo, tik lėtas užsipildymas */}
         <svg width="220" height="220" style={{ position: "absolute", transform: "rotate(-90deg)" }} aria-hidden="true">
-          <circle cx="110" cy="110" r={R} fill="none" stroke={C.line} strokeWidth="2" />
-          <circle cx="110" cy="110" r={R} fill="none" stroke={C.blue} strokeWidth="2.5" strokeLinecap="round"
+          {/* stroke per style, ne per atributą: SVG prezentaciniai atributai var() nepriima */}
+          <circle cx="110" cy="110" r={R} fill="none" strokeWidth="2" style={{ stroke: C.line }} />
+          <circle cx="110" cy="110" r={R} fill="none" strokeWidth="2.5" strokeLinecap="round"
             strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - pct)}
-            style={{ transition: "stroke-dashoffset 300ms linear" }} />
+            style={{ stroke: C.blue, transition: "stroke-dashoffset 300ms linear" }} />
         </svg>
 
         {/* kvėpavimo rutulys */}
@@ -1785,42 +1810,77 @@ function SeizureTimer({ timer, t, onEnd, onDiscard, onConfirmStale }) {
   );
 }
 
-// ---------- guide ----------
+// ---------- pirmas paleidimas ----------
 /**
- * Gido skyriai vienoje vietoje: tą patį sąrašą naudoja ir gidas, ir „parodyti“
- * antraštei paimti. Pirmas elementas – ID, kad nuorodos nepriklausytų nuo eilės.
+ * Vietinis nustatymas, ne registracija: paskyros nėra ir nebus — sveikatos
+ * duomenys pagal BDAR 9 str. paverstų autorių duomenų valdytoju.
+ *
+ * Kalba pirmiausia ir veikia iškart: be to visas pirmasis įspūdis ir apžvalga
+ * būtų lietuviški nepriklausomai nuo to, kas telefoną laiko rankose.
+ *
+ * Vienas ekranas, ne trijų žingsnių vedlys. Visi laukai neprivalomi, tad
+ * skaidyti juos į žingsnius reikštų tris paspaudimus ten, kur užtenka vieno.
  */
-const GUIDE_SECTIONS = (t) => [
-  ["seiz", t.gSeiz, t.gSeizB], ["aura", t.gAura, t.gAuraB], ["meds", t.gMeds, t.gMedsB],
-  ["notif", t.gNotif, t.gNotifB], ["report", t.gReport, t.gReportB],
-  ["backup", t.gBackup, t.gBackupB], ["privacy", t.gPrivacy, t.gPrivacyB],
-];
+function SetupSheet({ t, lang, name, notify, perm, onLang, onName, onNotify, onDone }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 130, background: C.bg, overflowY: "auto" }}>
+      <div style={{ maxWidth: 480, margin: "0 auto", padding: "calc(34px + env(safe-area-inset-top)) 20px 40px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <AuraMark size={40} />
+          <div>
+            <div style={{ fontFamily: T.serif, fontSize: 30, fontWeight: 700, lineHeight: 1.05, letterSpacing: "-0.01em" }}>Aura</div>
+            <div style={{ fontSize: 12.5, color: C.sub }}>{t.tagline}</div>
+          </div>
+        </div>
+        <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.6, marginTop: 16 }}>{t.setupIntro}</div>
 
-/**
- * Kurį ekrano elementą apvesti kiekvienam skyriui. `tab` nurodo, į kurį skirtuką
- * pirma persijungti — antraip mygtuko ekrane paprasčiausiai nebūtų.
- * „privacy“ sąraše nėra sąmoningai: jam nėra ką rodyti.
- */
-const TOUR = {
-  seiz: { tab: "meds", el: "seiz" },
-  aura: { tab: "meds", el: "aura" },
-  meds: { tab: "meds", el: "addMed" },
-  notif: { el: "settings" },
-  report: { el: "report" },
-  backup: { el: "settings" },
-};
+        <SectionLabel>{t.language}</SectionLabel>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {LANGS.map((l) => (
+            <Chip key={l.id} active={lang === l.id} onClick={() => onLang(l.id)}>{l.name}</Chip>
+          ))}
+        </div>
 
+        <SectionLabel>{t.setupName}</SectionLabel>
+        <input style={inputStyle} placeholder={t.namePh} value={name}
+          onChange={(e) => onName(e.target.value)} />
+        <div style={{ fontSize: 12, color: C.sub, marginTop: 6, lineHeight: 1.5 }}>{t.setupNameHint}</div>
+
+        <SectionLabel>{t.setupNotify}</SectionLabel>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.5 }}>{t.setupNotifyDesc}</div>
+          <Segmented ariaLabel={t.setupNotify} value={notify && perm === "granted"}
+            onChange={onNotify} color={C.sage} soft={C.sageSoft}
+            options={[{ v: true, label: t.n.on }, { v: false, label: t.n.off }]} />
+        </div>
+
+        <PrimaryBtn onClick={onDone} style={{ marginTop: 28 }}>{t.setupStart}</PrimaryBtn>
+        <div style={{ fontSize: 12, color: C.sub, textAlign: "center", marginTop: 14, lineHeight: 1.55 }}>
+          {t.setupLocal}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- pirmo paleidimo apžvalga ----------
 /**
- * Pirmo paleidimo apžvalgos žingsniai. Penki — tiek, kiek žmogus perbrauks
- * neprarasdamas kantrybės. Visi taikiniai yra „Vaistų“ skirtuke arba antraštėje,
- * todėl skirtukų perjunginėti nereikia.
+ * Pirmo paleidimo apžvalga. Kiekvienas žingsnis – viena eilutė; ilgesnio teksto
+ * ką tik atsidaręs žmogus neskaito.
+ *
+ * `tab` perjungia skirtuką prieš apvedant. Skirtukų mygtukai juostoje yra visada,
+ * tad techniškai perjungti nebūtina — bet be to žmogus matytų tik apvestą ikoną
+ * ir nė karto to ekrano, apie kurį kalbama.
  */
 const TOUR_STEPS = (t) => [
-  { el: "seiz", text: t.tour1 },
-  { el: "aura", text: t.tour2 },
-  { el: "addMed", text: t.tour3 },
-  { el: "nav", text: t.tour4 },
-  { el: "report", text: t.tour5 },
+  { el: "seiz", text: t.tour1, tab: "meds" },
+  { el: "aura", text: t.tour2, tab: "meds" },
+  { el: "addMed", text: t.tour3, tab: "meds" },
+  { el: "tab-seizures", text: t.tour4, tab: "seizures" },
+  { el: "tab-calendar", text: t.tour5, tab: "calendar" },
+  { el: "tab-state", text: t.tour6, tab: "state" },
+  { el: "tab-notes", text: t.tour7, tab: "notes" },
+  { el: "report", text: t.tour8, tab: "meds" },
 ];
 
 /**
@@ -1872,13 +1932,18 @@ function Spotlight({ target, label, hint, onClose, t, step, total, onNext, onSki
   return (
     // apžvalgoje fonas neuždaro: žingsnius baigia tik mygtukai, kad netyčinis
     // palietimas nenutrauktų vidury. Gide atvirkščiai – palietus uždaroma.
+    //
+    // Animacija be `both` sąmoningai: su fill-mode neįvykusi animacija (fonas,
+    // webview, sustabdytas piešimas) paliktų opacity 0 ir apvedimo nesimatytų
+    // visai. Geriau pasirodyti iškart, nei dingti.
     <div onClick={tour ? undefined : onClose} role="dialog" aria-label={label || hint}
-      style={{ position: "fixed", inset: 0, zIndex: 120, animation: "tourIn 600ms ease both" }}>
+      style={{ position: "fixed", inset: 0, zIndex: 120, animation: "tourIn 600ms ease" }}>
       {/* skylė iškertama ne fonu, o milžinišku šešėliu aplink kontūrą */}
       <div style={{
         position: "absolute", left: rect.left - pad, top: rect.top - pad,
         width: rect.width + pad * 2, height: rect.height + pad * 2,
-        borderRadius: 14, border: `2px solid ${C.white}`, pointerEvents: "none",
+        // tikras baltas, ne C.white: žiedas visada gula ant pritemdyto fono
+        borderRadius: 14, border: "2px solid #FFFFFF", pointerEvents: "none",
         boxShadow: "0 0 0 9999px rgba(27, 42, 49, 0.62)",
         transition: "left 500ms ease, top 500ms ease, width 500ms ease, height 500ms ease",
       }} />
@@ -1899,7 +1964,7 @@ function Spotlight({ target, label, hint, onClose, t, step, total, onNext, onSki
             <div style={{ fontSize: 12, color: C.sub, letterSpacing: "0.02em" }}>{step}/{total}</div>
             <button className="press" onClick={onNext}
               style={{ minHeight: 44, padding: "0 20px", borderRadius: 10, background: C.clay,
-                       color: "#FFF", fontSize: 14, fontWeight: 600 }}>
+                       color: C.onAccent, fontSize: 14, fontWeight: 600 }}>
               {step === total ? t.tourDone : t.tourNext}
             </button>
           </div>
@@ -1910,49 +1975,19 @@ function Spotlight({ target, label, hint, onClose, t, step, total, onNext, onSki
 }
 
 /**
- * Skyriai suskleisti: telefone ilgas tekstas neskaitomas, o žmogui paprastai rūpi
- * vienas konkretus dalykas. Pirmasis atidarytas, kad būtų aišku, jog jie atsidaro.
+ * Vienintelis likęs tekstinis pagalbos puslapis.
+ *
+ * Bendrasis gidas pašalintas sąmoningai: aprašomojo teksto niekas neskaito, o
+ * programėlę parodo pirmo paleidimo apžvalga. Šis skyrius liko todėl, kad jis
+ * kitoks – jį atsiverčia tik tas, kuriam priminimai jau neveikia, ir be jo
+ * Xiaomi vartotojas neturi jokio būdo sužinoti, kad kaltas telefonas.
+ *
+ * pre-line: turinys yra žingsnių sąrašas, ne pastraipa.
  */
-function GuideSheet({ t, onClose, initial, onShow }) {
-  const sections = GUIDE_SECTIONS(t);
-  // atidaromas skyrius nurodomas ID, ne indeksu: pridėjus naują skyrių nuorodos nenukeliauja kitur
-  const [open, setOpen] = useState(() => Math.max(0, sections.findIndex((s) => s[0] === initial)));
+function NotifHelpSheet({ t, onClose }) {
   return (
-    <Sheet title={t.guide} onClose={onClose} t={t}>
-      <div style={{ fontSize: 13, color: C.sub, marginBottom: 12, lineHeight: 1.5 }}>{t.guideIntro}</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {sections.map(([id, title, body], i) => {
-          const on = open === i;
-          return (
-            <div key={i} style={{ background: C.card, border: `1px solid ${on ? C.clay : C.line}`, borderRadius: 12, overflow: "hidden" }}>
-              <button className="press" onClick={() => setOpen(on ? -1 : i)} aria-expanded={on}
-                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-                         gap: 10, padding: "13px 14px", textAlign: "left" }}>
-                <span style={{ fontFamily: T.serif, fontSize: 15.5, fontWeight: 600, color: on ? C.clayDark : C.ink }}>{title}</span>
-                <ChevronRight size={18} style={{ color: C.sub, flexShrink: 0, transform: on ? "rotate(90deg)" : "none", transition: "transform 140ms ease" }} />
-              </button>
-              {/* pre-line: „Priminimai neateina laiku“ yra žingsnių sąrašas, o ne pastraipa;
-                  kitiems skyriams nieko nekeičia, nes juose naujų eilučių nėra */}
-              {on && (
-                <div style={{ padding: "0 14px 14px" }}>
-                  <div style={{ fontSize: 13.5, lineHeight: 1.65, color: C.ink, whiteSpace: "pre-line" }}>{body}</div>
-                  {TOUR[id] && (
-                    <button className="press" onClick={() => onShow(id)}
-                      style={{ marginTop: 12, minHeight: 44, padding: "0 14px", borderRadius: 10,
-                               border: `1px solid ${C.clay}`, color: C.clayDark, background: C.claySoft,
-                               fontSize: 13.5, fontWeight: 600 }}>
-                      {t.gShow} →
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.55, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.line}` }}>
-        {t.gDisc}
-      </div>
+    <Sheet title={t.gNotif} onClose={onClose} t={t}>
+      <div style={{ fontSize: 13.5, lineHeight: 1.65, color: C.ink, whiteSpace: "pre-line" }}>{t.gNotifB}</div>
     </Sheet>
   );
 }
@@ -2083,7 +2118,7 @@ function FeedbackSheet({ data, t, onClose }) {
 }
 
 // ---------- settings ----------
-function SettingsSheet({ data, update, onReset, onClose, onFeedback, onBackup, onGuide, t }) {
+function SettingsSheet({ data, update, onReset, onClose, onFeedback, onBackup, onNotifHelp, onReplayTour, t }) {
   const s = { name: "", overdueMin: 60, lang: "lt", notify: true, backupRemind: true, ...(data.settings || {}) };
   const setS = (k, v) => update((d) => { d.settings = { name: "", overdueMin: 60, lang: "lt", notify: true, backupRemind: true, ...(d.settings || {}), [k]: v }; return d; });
   const [copied, setCopied] = useState(false);
@@ -2110,11 +2145,18 @@ function SettingsSheet({ data, update, onReset, onClose, onFeedback, onBackup, o
   };
   return (
     <Sheet title={t.settings} onClose={onClose} t={t}>
-      <PrimaryBtn color={C.ink} onClick={() => onGuide()}>{t.guide}</PrimaryBtn>
+      <PrimaryBtn color={C.ink} onClick={onReplayTour}>{t.replayTour}</PrimaryBtn>
 
       <SectionLabel>{t.language}</SectionLabel>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {LANGS.map((l) => <Chip key={l.id} active={s.lang === l.id} onClick={() => setS("lang", l.id)}>{l.name}</Chip>)}
+      </div>
+
+      <SectionLabel>{t.theme}</SectionLabel>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {[["auto", t.thAuto], ["light", t.thLight], ["dark", t.thDark]].map(([id, label]) => (
+          <Chip key={id} active={(s.theme || "auto") === id} onClick={() => setS("theme", id)}>{label}</Chip>
+        ))}
       </div>
 
       <SectionLabel>{t.n.label}</SectionLabel>
@@ -2137,11 +2179,24 @@ function SettingsSheet({ data, update, onReset, onClose, onFeedback, onBackup, o
           </div>
           {/* žmogus čia atsiduria būtent tada, kai priminimai neveikia — gido skyrius
               apie gamintojo energijos taupymą turi būti po ranka, o ne slėptis gido gale */}
-          <button className="press" onClick={() => onGuide("notif")}
+          <button className="press" onClick={onNotifHelp}
             style={{ marginTop: 8, fontSize: 12.5, color: C.clayDark, textDecoration: "underline", textAlign: "left" }}>
             {t.n.diagHelp}
           </button>
         </>
+      )}
+
+      <SectionLabel>{t.bed}</SectionLabel>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.5 }}>{t.bedDesc}</div>
+        <Segmented ariaLabel={t.bed} value={s.bedOn === true}
+          onChange={(v) => setS("bedOn", v)}
+          color={C.sage} soft={C.sageSoft}
+          options={[{ v: true, label: t.n.on }, { v: false, label: t.n.off }]} />
+      </div>
+      {s.bedOn === true && (
+        <input type="time" value={s.bedtime || "22:30"} onChange={(e) => setS("bedtime", e.target.value)}
+          aria-label={t.bed} style={{ ...inputStyle, marginTop: 10, maxWidth: 160 }} />
       )}
 
       <SectionLabel>{t.profile}</SectionLabel>
@@ -2207,7 +2262,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
-  const [showGuide, setShowGuide] = useState(false);
+  const [showNotifHelp, setShowNotifHelp] = useState(false);
   const [timer, setTimer] = useState(null);        // { startedAt }
   const [measured, setMeasured] = useState(null);  // { startedAt, durSec } -> į formą
   const [showBreathe, setShowBreathe] = useState(false);
@@ -2216,10 +2271,12 @@ export default function App() {
   // Jei taip – atsiliepimo kortelė laukia kito paleidimo.
   const savedThisSession = useRef(false);
 
-  // gido „parodyti“: { el, label } arba null
-  const [spot, setSpot] = useState(null);
   // pirmo paleidimo apžvalga: -1 = neaktyvi
   const [tourStep, setTourStep] = useState(-1);
+  // pirmo paleidimo nustatymas (kalba, vardas, priminimai)
+  const [showSetup, setShowSetup] = useState(false);
+  const [setupPerm, setSetupPerm] = useState("prompt");
+  useEffect(() => { permissionState().then(setSetupPerm); }, [showSetup]);
 
   // veikiantis laikmatis atkuriamas iš Preferences, ne iš atminties:
   // programėlė galėjo būti nužudyta priepuolio metu
@@ -2287,12 +2344,11 @@ export default function App() {
   // „atgal“: pirma uždarom atidarytą lapą, tada grįžtam į pradinį skirtuką, ir tik tada išeinam
   useEffect(() => onBackButton(() => {
     if (tourStep >= 0) endTour();
-    else if (spot) setSpot(null);
     else if (showSettings) setShowSettings(false);
     else if (showReport) setShowReport(false);
     else if (tab !== "meds") setTab("meds");
     else exitApp();
-  }), [tourStep, spot, showSettings, showReport, tab]);
+  }), [tourStep, showSettings, showReport, tab]);
 
   // grįžus iš fono perpiešiam — kitaip po vidurnakčio rodytų vakarykštę dieną
   const [dayTick, bumpDay] = useState(0);
@@ -2343,22 +2399,79 @@ export default function App() {
     tourInit.current = true;
     if (data.settings?.tour === "done") return;
     const hasData = data.meds.length || data.seizures.length || data.notes.length;
-    if (hasData) { update((d) => { d.settings = { ...d.settings, tour: "done" }; return d; }); return; }
+    // jau naudojančiam programėlę ir nustatymas, ir apžvalga būtų žingsnis atgal
+    if (hasData) {
+      update((d) => { d.settings = { ...d.settings, tour: "done", setup: "done" }; return d; });
+      return;
+    }
+    // tuščiam dienynui pirma nustatymas; apžvalgą paleis jis pats, kai baigsis
+    if (data.settings?.setup !== "done") { setShowSetup(true); return; }
     setTab("meds");
     setTourStep(0);
   }, [loaded]);
 
+  const finishSetup = () => {
+    setShowSetup(false);
+    update((d) => { d.settings = { ...d.settings, setup: "done" }; return d; });
+    setTab("meds");
+    setTourStep(0);
+  };
+
   const tourSteps = useMemo(() => TOUR_STEPS(t), [t]);
+
+  // skirtukas perjungiamas efekte, ne piešiant – setTab piešimo metu būtų šalutinis
+  // efektas rendere ir React 18 concurrent režime elgtųsi nenuspėjamai
+  useEffect(() => {
+    if (tourStep < 0) return;
+    const s = tourSteps[tourStep];
+    if (s?.tab) setTab(s.tab);
+  }, [tourStep]);
+
   const endTour = () => {
     setTourStep(-1);
+    setTab("meds");   // apžvalga baigiasi ties „Užrašais“ – grąžinam į pradžią
     update((d) => { d.settings = { ...d.settings, tour: "done" }; return d; });
   };
+
+  /**
+   * Tema: atributas ant <html> perjungia CSS kintamuosius, o native pusė gauna
+   * tikrą HEX — status bar ir theme-color var() nesupranta.
+   *
+   * „auto“ atveju klausiam sistemos ir persipiešiam, jei vartotojas pakeičia
+   * telefono temą programėlei veikiant.
+   */
+  const theme = data.settings?.theme || "auto";
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.theme = theme;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      const dark = theme === "dark" || (theme === "auto" && mq.matches);
+      const p = dark ? PALETTE.dark : PALETTE.light;
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute("content", p.bg);
+      setNativeTheme(p.bg, dark);
+    };
+    apply();
+    if (theme !== "auto") return;
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [theme]);
 
   const backupRemind = data.settings?.backupRemind !== false;
   useEffect(() => {
     if (!loaded) return;
     syncBackupReminder(t, notify && backupRemind);
   }, [loaded, lang, notify, backupRemind]);
+
+  // Miego priminimas: numatytai išjungtas. Laikas yra vartotojo sprendimas, todėl
+  // pats savaime niekas neįsijungia – programėlė nesiūlo, kada eiti miegoti.
+  const bedOn = data.settings?.bedOn === true;
+  const bedtime = data.settings?.bedtime || "22:30";
+  useEffect(() => {
+    if (!loaded) return;
+    syncBedtimeReminder(t, notify && bedOn, bedtime);
+  }, [loaded, lang, notify, bedOn, bedtime, dayTick]);
 
   // 3.2: aura fiksuojama su laiko žyma IR iškart atidaromas kvėpavimo pratimas
   const logAura = () => {
@@ -2417,7 +2530,7 @@ export default function App() {
         {!storageOk && <div style={{ fontSize: 12, color: C.amber, fontWeight: 600, marginTop: 6 }}>{t.notSaved}</div>}
 
         {loaded ? <View data={data} update={update} t={t} lc={lc} onReport={() => setShowReport(true)} quickLog={quickLog}
-            onAura={logAura} auraMsg={auraMsg} fbCard={fbCard} recentAura={recentAura} onGuide={() => setShowGuide(true)}
+            onAura={logAura} auraMsg={auraMsg} fbCard={fbCard} recentAura={recentAura}
             onSaved={() => { savedThisSession.current = true; }}
             measured={measured} onMeasuredUsed={() => setMeasured(null)}
             timer={timer} onStartTimer={beginSeizure} onEndTimer={endSeizure}
@@ -2437,23 +2550,31 @@ export default function App() {
       {showSettings && <SettingsSheet data={data} update={update} t={t} onReset={resetAll}
         onFeedback={() => { setShowSettings(false); setShowFeedback(true); }}
         onBackup={() => { setShowSettings(false); setShowBackup(true); }}
-        onGuide={(section) => { setShowSettings(false); setShowGuide(section || true); }}
+        onNotifHelp={() => { setShowSettings(false); setShowNotifHelp(true); }}
+        onReplayTour={() => { setShowSettings(false); setTab("meds"); setTourStep(0); }}
         onClose={() => setShowSettings(false)} />}
-      {showGuide && <GuideSheet t={t} initial={showGuide} onClose={() => setShowGuide(false)}
-        onShow={(id) => {
-          const cfg = TOUR[id];
-          if (!cfg) return;
-          setShowGuide(false);
-          if (cfg.tab) setTab(cfg.tab);
-          const title = (GUIDE_SECTIONS(t).find((s) => s[0] === id) || [])[1];
-          setSpot({ el: cfg.el, label: title });
-        }} />}
-      {spot && tourStep < 0 && <Spotlight target={spot.el} label={spot.label} hint={t.gShowHint} onClose={() => setSpot(null)} />}
+      {showNotifHelp && <NotifHelpSheet t={t} onClose={() => setShowNotifHelp(false)} />}
       {tourStep >= 0 && tourSteps[tourStep] && (
         <Spotlight target={tourSteps[tourStep].el} hint={tourSteps[tourStep].text} t={t}
           step={tourStep + 1} total={tourSteps.length}
           onNext={() => { if (tourStep + 1 < tourSteps.length) setTourStep(tourStep + 1); else endTour(); }}
           onSkip={endTour} onClose={endTour} />
+      )}
+      {showSetup && (
+        <SetupSheet t={t} lang={lang} name={data.settings?.name || ""}
+          notify={notify} perm={setupPerm}
+          onLang={(id) => update((d) => { d.settings = { ...d.settings, lang: id }; return d; })}
+          onName={(v) => update((d) => { d.settings = { ...d.settings, name: v }; return d; })}
+          onNotify={async (v) => {
+            // įjungiant pirma prašom leidimo: be jo jungiklis meluotų
+            if (v && setupPerm !== "granted") {
+              const ok = await requestPermission();
+              setSetupPerm(ok ? "granted" : "denied");
+              if (!ok) return;
+            }
+            update((d) => { d.settings = { ...d.settings, notify: v }; return d; });
+          }}
+          onDone={finishSetup} />
       )}
       {showBreathe && <BreatheSheet data={data} update={update} t={t} onClose={() => setShowBreathe(false)} />}
       {showBackup && <BackupSheet t={t} onClose={() => setShowBackup(false)}
@@ -2469,8 +2590,8 @@ export default function App() {
           onClick={() => (timer ? endSeizure() : beginSeizure())}
           style={{
             pointerEvents: "auto", marginRight: 16, width: 56, height: 56, borderRadius: "50%",
-            background: timer ? C.red : C.plum, color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 4px 14px rgba(61,57,41,0.22)", transition: "transform 80ms ease",
+            background: timer ? C.red : C.plum, color: C.onAccent, display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: `0 4px 14px ${C.sh3}`, transition: "transform 80ms ease",
           }}>
           {timer ? <Square size={22} strokeWidth={2.6} /> : <Zap size={25} strokeWidth={2.3} />}
         </button>
@@ -2484,7 +2605,7 @@ export default function App() {
         {TABS.map(({ id, key, icon: Icon }) => {
           const active = tab === id;
           return (
-            <button key={id} onClick={() => setTab(id)} aria-current={active ? "page" : undefined} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "4px 0", color: active ? C.clayDark : C.sub, minWidth: 0 }}>
+            <button key={id} onClick={() => setTab(id)} aria-current={active ? "page" : undefined} data-tour={`tab-${id}`} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "4px 0", color: active ? C.clayDark : C.sub, minWidth: 0 }}>
               <span style={{ width: 40, height: 28, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 999, background: active ? C.claySoft : "transparent" }}>
                 <Icon size={19} strokeWidth={active ? 2.3 : 1.8} />
               </span>

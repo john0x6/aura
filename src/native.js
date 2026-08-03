@@ -18,12 +18,22 @@ export async function hideSplash() {
 export async function initStatusBar() {
   if (!isNative()) return;
   try {
-    // Style.Light = tamsus tekstas šviesiam fonui (mūsų fonas kreminis)
-    await StatusBar.setStyle({ style: Style.Light });
-    if (isAndroid()) {
-      await StatusBar.setOverlaysWebView({ overlay: false });
-      await StatusBar.setBackgroundColor({ color: "#EDF1F2" });
-    }
+    if (isAndroid()) await StatusBar.setOverlaysWebView({ overlay: false });
+  } catch (e) { /* kai kuriuose įrenginiuose neprivaloma */ }
+}
+
+/**
+ * Būsenos juosta perpiešiama kartu su tema. Spalva paduodama HEX, ne CSS
+ * kintamuoju: čia jau native pusė, ir `var(--c-bg)` jai nieko nereiškia.
+ *
+ * Style.Light = tamsus tekstas šviesiam fonui; Style.Dark = šviesus tekstas.
+ * Pavadinimai atvirkštiniai tam, ko tikiesi, todėl verta perskaityti du kartus.
+ */
+export async function setNativeTheme(bgHex, dark) {
+  if (!isNative()) return;
+  try {
+    await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
+    if (isAndroid()) await StatusBar.setBackgroundColor({ color: bgHex });
   } catch (e) { /* kai kuriuose įrenginiuose neprivaloma */ }
 }
 

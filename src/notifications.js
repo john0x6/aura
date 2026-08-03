@@ -7,8 +7,12 @@ const isAndroid = () => Capacitor.getPlatform() === "android";
 
 export const FOLLOWUP_MIN = 30;
 const BACKUP_ID = 2000000001;   // notifId grąžina 0…1999999999, tad čia susidūrimas neįmanomas
+const BED_BASE = 2000000100;    // 14 iš eilės einančių ID, po vieną kiekvienai dienai
+const BED_DAYS = 14;
 const HORIZON_DAYS = 14;
 const MAX_PENDING = 400;   // Android riba ~500 vienai programėlei; laikom atsargą
+
+const bedIds = () => Array.from({ length: BED_DAYS }, (_, i) => BED_BASE + i);
 
 export async function permissionState() {
   if (!isNative()) return "unsupported";
@@ -36,7 +40,7 @@ export async function pendingCount() {
  * o `syncBackupReminder` tada nesuveikia — priminimas apie kopiją būdavo ištrinamas
  * po pirmo programėlės minimizavimo ir nebeatsistatydavo.
  */
-export async function cancelAll(keepIds = [BACKUP_ID]) {
+export async function cancelAll(keepIds = [BACKUP_ID, ...bedIds()]) {
   if (!isNative()) return;
   const pending = await LocalNotifications.getPending();
   const mine = pending.notifications.filter((n) => !keepIds.includes(n.id));
@@ -143,6 +147,46 @@ export async function initChannel(t) {
   await LocalNotifications.createChannel({
     id: "backup", name: t.n.bkChannel, importance: 3, visibility: 1, vibration: false,
   });
+  // Atskiras kanalas: miego priminimas nėra kritinis kaip vaistai, ir vartotojas
+  // turi galėti nutildyti būtent jį, neliesdamas dozių.
+  await LocalNotifications.createChannel({
+    id: "bed", name: t.n.bedChannel, importance: 3, visibility: 1, vibration: false,
+  });
+}
+
+/**
+ * Miego priminimas nurodytu laiku.
+ *
+ * Planuojam tikslius `at` taškus 14 d. į priekį, kaip ir vaistams, o ne
+ * `every: "day"`: pakartojamus žadintuvus nutildo DND, riboja Doze ir jie
+ * neatsistato po force-stop. Atsarginės kopijos priminimas sau leidžia `every`,
+ * nes praleistas mėnesinis priminimas nieko nekainuoja — praleistas miego laikas
+ * kainuoja.
+ *
+ * Tekstas sąmoningai neutralus. Programėlė negali teigti, kad miegas mažina
+ * priepuolius — tai būtų medicininis nurodymas. Ji tik primena laiką, kurį
+ * vartotojas nusistatė pats.
+ */
+export async function syncBedtimeReminder(t, enabled, time) {
+  if (!isNative()) return { ok: false, reason: "web" };
+  try { await LocalNotifications.cancel({ notifications: bedIds().map((id) => ({ id })) }); }
+  catch (e) { /* nebuvo suplanuota */ }
+  if (!enabled || !time) return { ok: true, scheduled: 0 };
+  if ((await permissionState()) !== "granted") return { ok: false, reason: "perm" };
+
+  const now = new Date();
+  const notifications = [];
+  for (let d = 0; d < BED_DAYS; d++) {
+    const at = doseAt(addDays(now, d), time);
+    if (at <= now) continue;               // šiandienos laikas jau praėjo
+    notifications.push({
+      id: BED_BASE + d, title: t.n.bedTitle, body: t.n.bedBody,
+      schedule: { at, allowWhileIdle: true },
+      channelId: "bed", smallIcon: "ic_stat_aura",
+    });
+  }
+  if (notifications.length) await LocalNotifications.schedule({ notifications });
+  return { ok: true, scheduled: notifications.length };
 }
 
 /**
