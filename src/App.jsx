@@ -3,11 +3,11 @@ import { load as loadData, save as saveData, clear as clearData } from "./storag
 import { syncMedReminders, initChannel, permissionState, requestPermission, isNative,
          cancelDose, restoreDose, pendingCount, FOLLOWUP_MIN } from "./notifications";
 import { pad, dkey, todayKey, addDays } from "./dates";
-import { syncBackupReminder, syncBedtimeReminder } from "./notifications";
+import { syncBackupReminder, syncBedtimeReminder, initActions, onDoseAction } from "./notifications";
 import { exportBackup, validateBackup, restoreBackup } from "./backup";
 import { startTimer, loadTimer, clearTimer, elapsedSec, isStale, fmtDuration, bucketOf, ALERT_SEC } from "./seizureTimer";
 import { hideSplash, initStatusBar, setNativeTheme, onBackButton, onResume, exitApp } from "./native";
-import { Pill, Zap, Activity, NotebookPen, Plus, X, Check, Trash2, Minus, Wind, CalendarDays, ChevronLeft, ChevronRight, Play, Square, FileText, Settings as Cog, Pencil, Pause, AlertTriangle } from "lucide-react";
+import { Pill, Zap, Activity, Plus, X, Check, Trash2, Minus, Wind, CalendarDays, ChevronLeft, ChevronRight, Play, Square, FileText, Settings as Cog, Pencil, Pause, AlertTriangle } from "lucide-react";
 
 // ---------- design tokens: Claude-style ----------
 /**
@@ -133,9 +133,7 @@ const STR = {
     todayState: "Šiandienos būsena", sleep: "Miegas", stress: "Stresas", fatigue: "Nuovargis", alcohol: "Alkoholis",
     yes: "Taip", no: "Ne", optNote: "Pastaba (nebūtina)", autosave: "Įrašoma automatiškai.",
     sleep7: "Miegas per 7 d.", sleepHint: "Mažiau nei 6 h — vienas dažniausių priepuolių trigerių.",
-    newNote: "Naujas užrašas", note: "Užrašas", notesTitle: "Užrašai",
-    notesEmpty: "Tuščia. Užsirašyk klausimus gydytojui ar pastebėjimus apie savijautą.",
-    notePh: "Klausimai gydytojui, savijauta, pastebėjimai…", delNote: "Ištrinti užrašą",
+    rNotes: "Pastabos",
     report: "Ataskaita gydytojui", rSeiz: "Priepuoliai", rTypes: "Tipai", rAura: "Su aura",
     rLongest: "Ilgiausia trukmė", rAdh: "Vaistų laikymasis", rSleep: "Miegas", rSleepV: (a, s, n) => `vid. ${a} h · <6 h: ${s}/${n}`,
     rStressFat: "Stresas / nuovargis", rOf5: "(iš 5)", rAlco: "Alkoholis", rDays: (n) => `${n} d.`, copyText: "Kopijuoti kaip tekstą",
@@ -191,9 +189,8 @@ const STR = {
     tour2: "Pajutai aurą? Pažymėk čia.",
     tour3: "Pridėk vaistus — priminsim laiku.",
     tour4: "Visi priepuoliai vienoje vietoje.",
-    tour5: "Kalendorius — visas mėnuo iš karto.",
+    tour5: "Kalendorius — priepuolių raštas per mėnesį.",
     tour6: "Būsena: miegas, stresas, nuovargis.",
-    tour7: "Užrašai — kas netelpa niekur kitur.",
     tour8: "30 dienų suvestinė gydytojui. Dėl jos viskas ir renkama.",
     gNotif: "Priminimai neateina laiku", gNotifB: "Priminimai atiduodami telefono žadintuvų sistemai iki 14 dienų į priekį, todėl Aurai veikti nereikia. Jei žinutė pasirodo tik tada, kai atidarai programėlę, ją stabdo telefono energijos taupymas. Griežčiausi čia yra Xiaomi, Huawei, Samsung ir OnePlus.\n\nPirmiausia patikrink, ar priminimai apskritai suplanuoti: Nustatymai → Suplanuota priminimų → Tikrinti. Jei rodo 0, telefonas juos panaikino. Jei rodo didelį skaičių, o žinutė vis tiek vėluoja — priminimai sukurti teisingai, tik telefonas neleidžia jų parodyti.\n\nAbiem atvejais padeda tie patys nustatymai. Pavadinimai priklauso nuo telefono, bet keliai panašūs:\n\n1. Baterijos taupymas → Be apribojimų. Nustatymai → Programos → Programų tvarkyklė → Aura → Baterijos taupymas. Tai svarbiausias žingsnis — kol čia lieka taupymo režimas, telefonas stabdo priminimus, kad ir ką pakeistum kitur.\n\n2. Automatinis paleidimas (Autostart) — įjungti. Toje pačioje Auros kortelėje. Xiaomi jį išjungia pagal nutylėjimą.\n\n3. Paskutinių programėlių ekrane užrakink Aurą spynele. Kitaip „Išvalyti viską“ panaikina visus suplanuotus priminimus.\n\n4. Žadintuvai ir priminimai — leisti. Nustatymai → Programos → Speciali prieiga.\n\nPakeitęs palik telefoną kelioms valandoms ir pažiūrėk, ar priminimas ateina laiku pats.",
     change: "Keisti pratimą",
@@ -230,9 +227,7 @@ const STR = {
     todayState: "Today's state", sleep: "Sleep", stress: "Stress", fatigue: "Fatigue", alcohol: "Alcohol",
     yes: "Yes", no: "No", optNote: "Note (optional)", autosave: "Saved automatically.",
     sleep7: "Sleep over 7 days", sleepHint: "Under 6 h — one of the most common seizure triggers.",
-    newNote: "New note", note: "Note", notesTitle: "Notes",
-    notesEmpty: "Empty. Jot down questions for your doctor or things you notice.",
-    notePh: "Questions for the doctor, how you feel, observations…", delNote: "Delete note",
+    rNotes: "Notes",
     report: "Report for doctor", rSeiz: "Seizures", rTypes: "Types", rAura: "With aura",
     rLongest: "Longest duration", rAdh: "Medication adherence", rSleep: "Sleep", rSleepV: (a, s, n) => `avg ${a} h · <6 h: ${s}/${n}`,
     rStressFat: "Stress / fatigue", rOf5: "(of 5)", rAlco: "Alcohol", rDays: (n) => `${n} d.`, copyText: "Copy as text",
@@ -286,9 +281,8 @@ const STR = {
     tour2: "Feel an aura? Mark it here.",
     tour3: "Add your medications — we'll remind you on time.",
     tour4: "Every seizure in one place.",
-    tour5: "Calendar — the whole month at once.",
+    tour5: "Calendar — your seizure pattern across the month.",
     tour6: "Wellbeing: sleep, stress, fatigue.",
-    tour7: "Notes — whatever fits nowhere else.",
     tour8: "A 30-day summary for your doctor. That is what all of this is for.",
     gNotif: "Reminders arrive late", gNotifB: "Reminders are handed to the phone's alarm system up to 14 days ahead, so Aura does not need to be running. If a reminder only appears once you open the app, your phone's battery saver is holding it back. Xiaomi, Huawei, Samsung and OnePlus are the strictest.\n\nFirst check whether reminders were scheduled at all: Settings → Scheduled reminders → Check. If it shows 0, the phone deleted them. If it shows a large number and the reminder is still late, they were scheduled correctly and the phone is simply refusing to show them.\n\nThe same settings help in both cases. Names vary by phone, but the paths are similar:\n\n1. Battery saver → No restrictions. Settings → Apps → Manage apps → Aura → Battery saver. This is the one that matters most — while any saver mode is on, the phone holds reminders back no matter what else you change.\n\n2. Autostart — turn on. In the same Aura entry. Xiaomi disables it by default.\n\n3. Lock Aura in the recent apps screen. Otherwise “Clear all” wipes every scheduled reminder.\n\n4. Alarms & reminders — allow. Settings → Apps → Special app access.\n\nAfter changing these, leave the phone alone for a few hours and see whether a reminder arrives on its own.",
     change: "Change exercise",
@@ -325,9 +319,7 @@ const STR = {
     todayState: "Состояние сегодня", sleep: "Сон", stress: "Стресс", fatigue: "Усталость", alcohol: "Алкоголь",
     yes: "Да", no: "Нет", optNote: "Заметка (необязательно)", autosave: "Сохраняется автоматически.",
     sleep7: "Сон за 7 дней", sleepHint: "Меньше 6 ч — один из самых частых триггеров приступов.",
-    newNote: "Новая заметка", note: "Заметка", notesTitle: "Заметки",
-    notesEmpty: "Пусто. Запишите вопросы врачу или свои наблюдения.",
-    notePh: "Вопросы врачу, самочувствие, наблюдения…", delNote: "Удалить заметку",
+    rNotes: "Заметки",
     report: "Отчёт для врача", rSeiz: "Приступы", rTypes: "Типы", rAura: "С аурой",
     rLongest: "Самый долгий", rAdh: "Соблюдение приёма", rSleep: "Сон", rSleepV: (a, s, n) => `сред. ${a} ч · <6 ч: ${s}/${n}`,
     rStressFat: "Стресс / усталость", rOf5: "(из 5)", rAlco: "Алкоголь", rDays: (n) => `${n} д.`, copyText: "Скопировать как текст",
@@ -381,9 +373,8 @@ const STR = {
     tour2: "Почувствовали ауру? Отметьте здесь.",
     tour3: "Добавьте лекарства — напомним вовремя.",
     tour4: "Все приступы в одном месте.",
-    tour5: "Календарь — весь месяц сразу.",
+    tour5: "Календарь — картина приступов за месяц.",
     tour6: "Состояние: сон, стресс, усталость.",
-    tour7: "Заметки — всё, что не подходит в другие разделы.",
     tour8: "Сводка за 30 дней для врача. Ради неё всё и собирается.",
     gNotif: "Напоминания приходят с опозданием", gNotifB: "Напоминания передаются системе будильников телефона на 14 дней вперёд, поэтому Aura не обязана работать. Если уведомление появляется только когда вы открываете приложение, его задерживает энергосбережение телефона. Строже всего — Xiaomi, Huawei, Samsung и OnePlus.\n\nСначала проверьте, запланированы ли напоминания вообще: Настройки → Запланировано напоминаний → Проверить. Если показывает 0, телефон их удалил. Если показывает большое число, а уведомление всё равно опаздывает — напоминания созданы правильно, телефон просто не даёт их показать.\n\nВ обоих случаях помогают одни и те же настройки. Названия зависят от телефона, но пути похожи:\n\n1. Энергосбережение → Без ограничений. Настройки → Приложения → Все приложения → Aura → Энергосбережение. Это главное — пока включён любой режим экономии, телефон задерживает напоминания, что бы вы ни меняли в других местах.\n\n2. Автозапуск (Autostart) — включить. В той же карточке Aura. Xiaomi отключает его по умолчанию.\n\n3. Закрепите Aura в списке недавних приложений. Иначе «Очистить всё» удаляет все запланированные напоминания.\n\n4. Будильники и напоминания — разрешить. Настройки → Приложения → Специальный доступ.\n\nПосле изменений оставьте телефон на несколько часов и проверьте, придёт ли напоминание само.",
     change: "Изменить упражнение",
@@ -420,9 +411,7 @@ const STR = {
     todayState: "Dzisiejszy stan", sleep: "Sen", stress: "Stres", fatigue: "Zmęczenie", alcohol: "Alkohol",
     yes: "Tak", no: "Nie", optNote: "Notatka (opcjonalnie)", autosave: "Zapisywane automatycznie.",
     sleep7: "Sen przez 7 dni", sleepHint: "Poniżej 6 h — jeden z najczęstszych wyzwalaczy napadów.",
-    newNote: "Nowa notatka", note: "Notatka", notesTitle: "Notatki",
-    notesEmpty: "Pusto. Zapisz pytania do lekarza albo swoje spostrzeżenia.",
-    notePh: "Pytania do lekarza, samopoczucie, spostrzeżenia…", delNote: "Usuń notatkę",
+    rNotes: "Notatki",
     report: "Raport dla lekarza", rSeiz: "Napady", rTypes: "Typy", rAura: "Z aurą",
     rLongest: "Najdłuższy", rAdh: "Przestrzeganie leczenia", rSleep: "Sen", rSleepV: (a, s, n) => `śr. ${a} h · <6 h: ${s}/${n}`,
     rStressFat: "Stres / zmęczenie", rOf5: "(z 5)", rAlco: "Alkohol", rDays: (n) => `${n} dni`, copyText: "Kopiuj jako tekst",
@@ -476,9 +465,8 @@ const STR = {
     tour2: "Czujesz aurę? Zaznacz tutaj.",
     tour3: "Dodaj leki — przypomnimy na czas.",
     tour4: "Wszystkie napady w jednym miejscu.",
-    tour5: "Kalendarz — cały miesiąc naraz.",
+    tour5: "Kalendarz — obraz napadów w skali miesiąca.",
     tour6: "Samopoczucie: sen, stres, zmęczenie.",
-    tour7: "Notatki — co nie pasuje nigdzie indziej.",
     tour8: "Podsumowanie 30 dni dla lekarza. Po to wszystko jest zbierane.",
     gNotif: "Przypomnienia przychodzą z opóźnieniem", gNotifB: "Przypomnienia są przekazywane systemowi alarmów telefonu na 14 dni do przodu, więc Aura nie musi działać. Jeśli powiadomienie pojawia się dopiero po otwarciu aplikacji, wstrzymuje je oszczędzanie energii. Najsurowsze są Xiaomi, Huawei, Samsung i OnePlus.\n\nNajpierw sprawdź, czy przypomnienia w ogóle zostały zaplanowane: Ustawienia → Zaplanowane przypomnienia → Sprawdź. Jeśli pokazuje 0, telefon je usunął. Jeśli pokazuje dużą liczbę, a powiadomienie i tak się spóźnia — przypomnienia są poprawne, telefon po prostu nie pozwala ich pokazać.\n\nW obu przypadkach pomagają te same ustawienia. Nazwy zależą od telefonu, ale ścieżki są podobne:\n\n1. Oszczędzanie baterii → Bez ograniczeń. Ustawienia → Aplikacje → Zarządzaj aplikacjami → Aura → Oszczędzanie baterii. To najważniejszy krok — dopóki działa jakikolwiek tryb oszczędzania, telefon wstrzymuje przypomnienia, cokolwiek zmienisz gdzie indziej.\n\n2. Autostart — włącz. W tym samym wpisie Aura. Xiaomi wyłącza go domyślnie.\n\n3. Zablokuj Aurę na ekranie ostatnich aplikacji. Inaczej „Wyczyść wszystko” kasuje wszystkie zaplanowane przypomnienia.\n\n4. Alarmy i przypomnienia — zezwól. Ustawienia → Aplikacje → Specjalny dostęp.\n\nPo zmianach zostaw telefon na kilka godzin i sprawdź, czy przypomnienie przyjdzie samo.",
     change: "Zmień ćwiczenie",
@@ -496,6 +484,8 @@ const NOTIF = {
   lt: {
     title: "Laikas išgerti vaistus", body: (m) => `${m.name}${m.dose ? " · " + m.dose : ""}`,
     fuTitle: "Dozė nepažymėta", fuBody: (m) => `${m.name} — ar tikrai išgėrei?`,
+    // mygtukas pačiame pranešime; belytė forma, kad tiktų visiems
+    actTaken: "Išgėriau",
     channel: "Vaistų priminimai", label: "Priminimai",
     bkTitle: "Pasidaryk atsarginę kopiją", bkBody: "Dienyno duomenys saugomi tik šiame telefone.", bkChannel: "Kopijos priminimai",
     bedTitle: "Metas ruoštis miegoti", bedBody: "Šį laiką nusistatei pats.", bedChannel: "Miego priminimas",
@@ -508,6 +498,7 @@ const NOTIF = {
   en: {
     title: "Time to take your medication", body: (m) => `${m.name}${m.dose ? " · " + m.dose : ""}`,
     fuTitle: "Dose not marked", fuBody: (m) => `${m.name} — did you actually take it?`,
+    actTaken: "Taken",
     channel: "Medication reminders", label: "Reminders",
     bkTitle: "Time to back up", bkBody: "Your diary is stored only on this phone.", bkChannel: "Backup reminders",
     bedTitle: "Time to get ready for bed", bedBody: "You set this time yourself.", bedChannel: "Bedtime reminder",
@@ -520,6 +511,7 @@ const NOTIF = {
   ru: {
     title: "Время принять лекарство", body: (m) => `${m.name}${m.dose ? " · " + m.dose : ""}`,
     fuTitle: "Доза не отмечена", fuBody: (m) => `${m.name} — вы действительно приняли?`,
+    actTaken: "Выпито",
     channel: "Напоминания о лекарствах", label: "Напоминания",
     bkTitle: "Сделайте резервную копию", bkBody: "Дневник хранится только на этом телефоне.", bkChannel: "Напоминания о копиях",
     bedTitle: "Пора готовиться ко сну", bedBody: "Это время вы выбрали сами.", bedChannel: "Напоминание о сне",
@@ -532,6 +524,7 @@ const NOTIF = {
   pl: {
     title: "Czas wziąć lek", body: (m) => `${m.name}${m.dose ? " · " + m.dose : ""}`,
     fuTitle: "Dawka nieoznaczona", fuBody: (m) => `${m.name} — czy naprawdę wziąłeś?`,
+    actTaken: "Zażyte",
     channel: "Przypomnienia o lekach", label: "Przypomnienia",
     bkTitle: "Zrób kopię zapasową", bkBody: "Dziennik jest przechowywany tylko na tym telefonie.", bkChannel: "Przypomnienia o kopiach",
     bedTitle: "Czas przygotować się do snu", bedBody: "Ten czas ustawiłeś samodzielnie.", bedChannel: "Przypomnienie o śnie",
@@ -550,6 +543,7 @@ const fShort = (d, lc) => new Intl.DateTimeFormat(lc, { month: "short", day: "nu
 const fDay = (d, lc) => new Intl.DateTimeFormat(lc, { month: "long", day: "numeric" }).format(d);
 const fMonth = (d, lc) => new Intl.DateTimeFormat(lc, { month: "long", year: "numeric" }).format(d);
 const fDateTime = (iso, lc) => { const d = new Date(iso); return `${fShort(d, lc)}, ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const fTime = (iso) => { const d = new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 const wdShort = (lc) => { const f = new Intl.DateTimeFormat(lc, { weekday: "short" }); return Array.from({ length: 7 }, (_, i) => f.format(new Date(2024, 0, 7 + i))); };
 const toLocalInput = (d) => { const x = new Date(d.getTime() - d.getTimezoneOffset() * 60000); return x.toISOString().slice(0, 16); };
 const parseDay = (s) => { const [y, m, dd] = s.split("-").map(Number); return new Date(y, m - 1, dd); };
@@ -566,6 +560,35 @@ const FEEDBACK_TO = "jormor16@valdorfas.org";
 const APP_VERSION = "1.4";
 const DEFAULT_DATA = { meds: [], doseLog: {}, seizures: [], daily: {}, notes: [], events: [], calm: [], auraTypes: [], auraEvents: [], settings: { name: "", overdueMin: 60, lang: "lt", notify: true, backupRemind: true, opens: 0, fbCard: "pending" } };
 const AURA_LINK_MIN = 60;   // per kiek laiko po auros priepuolis laikomas susijusiu
+
+/**
+ * Užrašų skirtukas pašalintas, todėl seni atskiri užrašai perkeliami prie tos
+ * dienos, kurią buvo paskutinį kartą redaguoti — iš ten jie patenka į ataskaitą.
+ * Be šito jie liktų duomenyse ir atsarginėse kopijose, bet be jokio kelio juos
+ * pamatyti; tyliai paslėpti sveikatos įrašus būtų blogiau nei jų neturėti.
+ *
+ * Idempotentiška: po perkėlimo `notes` lieka tuščias masyvas, o pakartotinis
+ * paleidimas iš neperrašytos saugyklos duoda tą patį rezultatą, ne dublikatus.
+ * `notes` laukas paliekamas, kad senų kopijų formato tikrinimas nesulūžtų.
+ */
+function migrateNotes(d) {
+  if (!Array.isArray(d.notes) || !d.notes.length) return d;
+  for (const n of d.notes) {
+    const txt = (n.text || "").trim();
+    if (!txt) continue;
+    const k = dkey(new Date(n.updated));
+    const cur = { ...DAILY_EMPTY, ...(d.daily[k] || {}) };
+    cur.note = cur.note ? `${cur.note}\n${txt}` : txt;
+    d.daily[k] = cur;
+  }
+  d.notes = [];
+  return d;
+}
+
+const hydrate = (p) => migrateNotes({
+  ...DEFAULT_DATA, ...p,
+  settings: { ...DEFAULT_DATA.settings, ...(p.settings || {}) },
+});
 const DAILY_EMPTY = { sleep: null, stress: null, fatigue: null, alcohol: null, note: "" };
 const TYPE_IDS = ["tonicClonic", "absence", "focal", "myoclonic", "other"];
 const EFFECT_IDS = ["fall", "injury", "tongue", "incontinence"];
@@ -842,7 +865,7 @@ function DoseRow({ time, takenAt, overdue, onToggle, t }) {
   );
 }
 
-function MedsView({ data, update, t, lc, onReport, timer, onStartTimer, onEndTimer, onDiscardTimer, onAura, auraMsg, fbCard }) {
+function MedsView({ data, update, t, lc, onReport, timer, onEndTimer, onDiscardTimer, fbCard }) {
   const [editing, setEditing] = useState(undefined);
   const tk = todayKey();
   const log = data.doseLog[tk] || {};
@@ -872,20 +895,13 @@ function MedsView({ data, update, t, lc, onReport, timer, onStartTimer, onEndTim
 
   return (
     <div>
-      {timer ? (
+      {/* Priepuolio ir auros mygtukai perkelti į Priepuolių skirtuką: šis ekranas
+          skirtas vaistams, o kasdien dažniausiai atliekamas veiksmas čia yra dozės
+          pažymėjimas. Veikiantis laikmatis lieka matomas ir čia — 5 min riba
+          svarbesnė už skirtukų tvarką. */}
+      {timer && (
         <SeizureTimer timer={timer} t={t} onEnd={() => onEndTimer()} onDiscard={onDiscardTimer}
           onConfirmStale={() => onEndTimer()} />
-      ) : (
-        <>
-          <PrimaryBtn color={C.plum} onClick={onStartTimer} tour="seiz" style={{ marginTop: 14, padding: "16px 16px", fontSize: 16 }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Zap size={19} /> {t.seizStart}</span>
-          </PrimaryBtn>
-          <button className="press" onClick={onAura} data-tour="aura" style={{
-            width: "100%", marginTop: 8, padding: "12px 16px", borderRadius: 12,
-            border: `1px solid ${C.plum}`, background: C.card, color: C.plum, fontSize: 14.5, fontWeight: 600,
-          }}>{t.auraFeel}</button>
-          {auraMsg && <div style={{ fontSize: 13, color: C.plum, fontWeight: 600, marginTop: 8, textAlign: "center" }}>{t.auraLogged}</div>}
-        </>
       )}
       {fbCard}
       <SummaryStrip data={data} t={t} onOpen={onReport} />
@@ -1079,7 +1095,7 @@ function SeizureForm({ initial, measured, recentAura, onSave, onClose, t, auraTy
   );
 }
 
-function SeizuresView({ data, update, t, lc, onReport, quickLog, measured, onMeasuredUsed, timer, onStartTimer, onEndTimer, onDiscardTimer, recentAura, onSaved, onAura }) {
+function SeizuresView({ data, update, t, lc, onReport, quickLog, measured, onMeasuredUsed, timer, onStartTimer, onEndTimer, onDiscardTimer, recentAura, onSaved, onAura, auraMsg }) {
   const [editing, setEditing] = useState(undefined);
   useEffect(() => { if (quickLog) setEditing(null); }, [quickLog]);
   useEffect(() => { if (measured) setEditing(null); }, [measured]); // undefined=uždaryta, null=naujas, objektas=redaguojamas
@@ -1095,9 +1111,16 @@ function SeizuresView({ data, update, t, lc, onReport, quickLog, measured, onMea
           onConfirmStale={() => onEndTimer()} />
       ) : (
         <>
-          <PrimaryBtn color={C.plum} onClick={onStartTimer} style={{ marginTop: 14, padding: "16px 16px", fontSize: 16 }}>
+          <PrimaryBtn color={C.plum} onClick={onStartTimer} tour="seiz" style={{ marginTop: 14, padding: "16px 16px", fontSize: 16 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Zap size={19} /> {t.seizStart}</span>
           </PrimaryBtn>
+          {/* atkeliavo iš Vaistų skirtuko: aura yra vienintelė priepuolio dalis,
+              kurią išgyveni sąmoningai, tad šis mygtukas realiai paspaudžiamas */}
+          <button className="press" onClick={onAura} data-tour="aura" style={{
+            width: "100%", marginTop: 8, padding: "12px 16px", borderRadius: 12,
+            border: `1px solid ${C.plum}`, background: C.card, color: C.plum, fontSize: 14.5, fontWeight: 600,
+          }}>{t.auraFeel}</button>
+          {auraMsg && <div style={{ fontSize: 13, color: C.plum, fontWeight: 600, marginTop: 8, textAlign: "center" }}>{t.auraLogged}</div>}
           <button className="press" onClick={() => setEditing(null)}
             style={{ width: "100%", padding: 10, marginTop: 8, fontSize: 14, fontWeight: 600, color: C.sub }}>
             {t.regSeiz}
@@ -1240,7 +1263,18 @@ function CalendarView({ data, update, t, lc }) {
   const byDate = {};
   data.events.forEach((e) => { (byDate[e.date] = byDate[e.date] || []).push(e); });
 
+  // Priepuoliai tinklelyje. Iki šiol kalendorius rodė tik savus įvykius, todėl
+  // vienintelis ekranas, kuriame matomas dažnio raštas per mėnesius — tai, į ką
+  // žiūrima gydytojo kabinete — apie priepuolius nieko nesakė.
+  // `s.at` yra ISO tekstas (žr. SeizureForm), skirtingai nuo auros įvykių.
+  const seizByDate = useMemo(() => {
+    const m = {};
+    data.seizures.forEach((s) => { const k = dkey(new Date(s.at)); (m[k] = m[k] || []).push(s); });
+    return m;
+  }, [data.seizures]);
+
   const tk = todayKey();
+  const selSeiz = (seizByDate[sel] || []).sort((a, b) => new Date(a.at) - new Date(b.at));
   const selEvents = (byDate[sel] || []).sort((a, b) => ((a.time || "") < (b.time || "") ? -1 : 1));
   const upcoming = data.events.filter((e) => e.date >= tk)
     .sort((a, b) => (a.date + (a.time || "") < b.date + (b.time || "") ? -1 : 1)).slice(0, 5);
@@ -1275,6 +1309,7 @@ function CalendarView({ data, update, t, lc }) {
             const k = `${y}-${pad(m + 1)}-${pad(day)}`;
             const isToday = k === tk, isSel = k === sel;
             const evs = byDate[k] || [];
+            const sz = seizByDate[k] || [];
             return (
               <button key={k} onClick={() => setSel(k)} style={{
                 height: 46, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
@@ -1282,8 +1317,13 @@ function CalendarView({ data, update, t, lc }) {
                 background: isToday ? C.claySoft : "transparent",
               }}>
                 <div style={{ fontSize: 14, fontWeight: isToday || isSel ? 700 : 400, color: isToday ? C.clayDark : C.ink }}>{day}</div>
-                <div style={{ display: "flex", gap: 2, height: 6 }}>
-                  {evs.slice(0, 3).map((e) => <div key={e.id} style={{ width: 5, height: 5, borderRadius: "50%", background: (CAT_COLOR[e.cat] || CAT_COLOR.other)[0] }} />)}
+                {/* Priepuoliai pirmi. Žymimi brūkšneliu, ne tašku: C.plum ir C.blue
+                    paletėje yra ta pati spalva, tad gydytojo vizitas ir priepuolis
+                    skirtųsi tik dydžiu. Forma skiria patikimiau nei 1 px, ir veikia
+                    esant spalvų neskyrimui. */}
+                <div style={{ display: "flex", alignItems: "center", gap: 2, height: 6 }}>
+                  {sz.slice(0, 3).map((s) => <div key={s.id} style={{ width: 7, height: 4, borderRadius: 2, background: C.plum }} />)}
+                  {evs.slice(0, Math.max(0, 3 - sz.length)).map((e) => <div key={e.id} style={{ width: 5, height: 5, borderRadius: "50%", background: (CAT_COLOR[e.cat] || CAT_COLOR.other)[0] }} />)}
                 </div>
               </button>
             );
@@ -1293,7 +1333,23 @@ function CalendarView({ data, update, t, lc }) {
 
       <SectionLabel style={{ textTransform: "capitalize" }}>{fDay(parseDay(sel), lc)}</SectionLabel>
       <Card style={{ padding: "6px 14px 14px" }}>
-        {selEvents.length === 0 && <div style={{ color: C.sub, fontSize: 14, padding: "10px 2px" }}>{t.noEventsDay}</div>}
+        {selSeiz.length === 0 && selEvents.length === 0 && <div style={{ color: C.sub, fontSize: 14, padding: "10px 2px" }}>{t.noEventsDay}</div>}
+        {/* tik peržiūra: redaguojama Priepuolių skirtuke, kad nebūtų dviejų kelių
+            į tą patį įrašą */}
+        {selSeiz.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "10px 0 4px" }}>
+            {selSeiz.map((s) => (
+              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, borderLeft: `3px solid ${C.plum}`, paddingLeft: 10 }}>
+                <Zap size={15} style={{ color: C.plum, flexShrink: 0 }} />
+                <div style={{ fontSize: 14 }}>
+                  <span style={{ fontWeight: 600 }}>{fTime(s.at)}</span>
+                  {" · "}{lbl(t.ty, s.type)}
+                  {s.durSec != null ? ` · ${fmtDuration(s.durSec)}` : s.dur ? ` · ${s.dur}` : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {selEvents.map((e) => <EventRow key={e.id} e={e} t={t} lc={lc} onEdit={() => setEditing(e)} onDelete={() => removeEvent(e.id)} />)}
         <PrimaryBtn onClick={() => setEditing(null)} style={{ marginTop: 12 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Plus size={17} /> {t.addForDay}</span>
@@ -1559,61 +1615,6 @@ function StateView({ data, update, t, lc }) {
   );
 }
 
-// ---------- notes ----------
-function NoteEditor({ note, onSave, onDelete, onClose, t }) {
-  const [text, setText] = useState(note?.text || "");
-  return (
-    <Sheet title={note ? t.note : t.newNote} onClose={onClose} t={t}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <textarea autoFocus style={{ ...inputStyle, minHeight: 180, resize: "vertical", lineHeight: 1.6 }} placeholder={t.notePh} value={text} onChange={(e) => setText(e.target.value)} />
-        <PrimaryBtn disabled={!text.trim()} onClick={() => onSave(text.trim())}>{t.save}</PrimaryBtn>
-        {note && <button onClick={onDelete} style={{ color: C.red, fontWeight: 600, fontSize: 14, padding: 8 }}>{t.delNote}</button>}
-      </div>
-    </Sheet>
-  );
-}
-
-function NotesView({ data, update, t, lc }) {
-  const [editing, setEditing] = useState(undefined);
-  const list = [...data.notes].sort((a, b) => new Date(b.updated) - new Date(a.updated));
-  return (
-    <div>
-      <PrimaryBtn onClick={() => setEditing(null)} style={{ marginTop: 14 }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Plus size={17} /> {t.newNote}</span>
-      </PrimaryBtn>
-      <SectionLabel>{t.notesTitle}</SectionLabel>
-      {list.length === 0 && <Card style={{ textAlign: "center", padding: 24, color: C.sub, fontSize: 14, lineHeight: 1.5 }}>{t.notesEmpty}</Card>}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {list.map((n) => {
-          const lines = n.text.split("\n");
-          return (
-            <Card key={n.id} style={{ padding: 14, cursor: "pointer" }}>
-              <div onClick={() => setEditing(n)}>
-                <div style={{ fontFamily: T.serif, fontWeight: 600, fontSize: 16, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lines[0]}</div>
-                {lines.length > 1 && <div style={{ fontSize: 13, color: C.sub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lines.slice(1).join(" ")}</div>}
-                <div style={{ fontSize: 12, color: C.sub, marginTop: 6 }}>{fDateTime(n.updated, lc)}</div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-
-      {editing !== undefined && (
-        <NoteEditor t={t} note={editing} onClose={() => setEditing(undefined)}
-          onSave={(text) => {
-            update((d) => {
-              if (editing) d.notes = d.notes.map((x) => (x.id === editing.id ? { ...x, text, updated: new Date().toISOString() } : x));
-              else d.notes.push({ id: uid(), text, updated: new Date().toISOString() });
-              return d;
-            });
-            setEditing(undefined);
-          }}
-          onDelete={() => { if (editing) update((d) => { d.notes = d.notes.filter((x) => x.id !== editing.id); return d; }); setEditing(undefined); }} />
-      )}
-    </div>
-  );
-}
-
 // ---------- report ----------
 function buildReport(data, days, t) {
   const now = new Date();
@@ -1645,6 +1646,20 @@ function buildReport(data, days, t) {
 
   const dailies = [];
   for (let i = 0; i < days; i++) { const e = data.daily[dkey(addDays(now, -i))]; if (e) dailies.push(e); }
+
+  /* Laisvas tekstas iki šiol niekur nekeliavo: rašyti buvo galima trijose
+     vietose, o ataskaita neėmė nė vienos. Neurologui „prieš priepuolį dvi paras
+     nemiegojau“ pasako daugiau nei bet kuris vidurkis, todėl pastabos eina į
+     ataskaitą su data. Neapkarpom: tekstą parašė pats vartotojas, ir tyliai
+     nutraukti medicininį pastebėjimą būtų blogiau nei ilga ataskaita. */
+  const notes = [];
+  for (let i = 0; i < days; i++) {
+    const k = dkey(addDays(now, -i));
+    const dn = (data.daily[k]?.note || "").trim();
+    if (dn) notes.push({ k, text: dn });
+    seiz.filter((s) => dkey(new Date(s.at)) === k && (s.note || "").trim())
+      .forEach((s) => notes.push({ k, who: lbl(t.ty, s.type), text: s.note.trim() }));
+  }
   const sleeps = dailies.filter((e) => e.sleep != null).map((e) => e.sleep);
   const sleepAvg = avg(sleeps);
   const shortN = sleeps.filter((h) => h < 6).length;
@@ -1676,9 +1691,14 @@ function buildReport(data, days, t) {
   if (sleepAvg != null) L.push(`${t.rSleep.toUpperCase()}: ${t.rSleepV(sleepAvg, shortN, sleeps.length)}`);
   if (stressAvg != null || fatAvg != null) L.push(`${t.rStressFat.toUpperCase()}: ${stressAvg ?? "—"} / ${fatAvg ?? "—"} ${t.rOf5}`);
   if (alcoAns) L.push(`${t.rAlco.toUpperCase()}: ${t.rDays(alcoN)}` + ` (${t.rAnswered(alcoAns, days)})`);
+  if (notes.length) {
+    L.push("");
+    L.push(`${t.rNotes.toUpperCase()}:`);
+    notes.forEach((n) => L.push(`  ${n.k}${n.who ? " · " + n.who : ""}: ${n.text.replace(/\n/g, " ")}`));
+  }
   L.push("");
   L.push(t.rFooter);
-  return { text: L.join("\n"), seiz, types, trigs, effs, auraN, auraAns, auraKinds, alcoAns, adhDays, durMax, adh, taken, scheduled, sleepAvg, shortN, sleepsN: sleeps.length, stressAvg, fatAvg, alcoN };
+  return { text: L.join("\n"), seiz, types, trigs, effs, auraN, auraAns, auraKinds, alcoAns, adhDays, durMax, adh, taken, scheduled, sleepAvg, shortN, sleepsN: sleeps.length, stressAvg, fatAvg, alcoN, notes };
 }
 
 function Stat({ label, value, color = C.ink }) {
@@ -1717,6 +1737,19 @@ function ReportSheet({ data, onClose, t }) {
         {(r.stressAvg != null || r.fatAvg != null) && <Stat label={t.rStressFat} value={`${r.stressAvg ?? "—"} / ${r.fatAvg ?? "—"} ${t.rOf5}`} />}
         {r.alcoAns > 0 && <Stat label={t.rAlco} value={`${t.rDays(r.alcoN)} · ${t.rAnswered(r.alcoAns, days)}`} />}
       </Card>
+      {r.notes.length > 0 && (
+        <>
+          <SectionLabel>{t.rNotes}</SectionLabel>
+          <Card style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+            {r.notes.map((n, i) => (
+              <div key={i} style={{ fontSize: 13.5, lineHeight: 1.5 }}>
+                <span style={{ color: C.sub, fontWeight: 600 }}>{n.k}{n.who ? ` · ${n.who}` : ""}</span>
+                <div style={{ whiteSpace: "pre-wrap" }}>{n.text}</div>
+              </div>
+            ))}
+          </Card>
+        </>
+      )}
       <PrimaryBtn onClick={copy} style={{ marginTop: 14 }}>{copied ? t.copied : t.copyText}</PrimaryBtn>
       <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>{t.rNote}</div>
     </Sheet>
@@ -1872,14 +1905,16 @@ function SetupSheet({ t, lang, name, notify, perm, onLang, onName, onNotify, onD
  * tad techniškai perjungti nebūtina — bet be to žmogus matytų tik apvestą ikoną
  * ir nė karto to ekrano, apie kurį kalbama.
  */
+// Tvarka seka skirtukus, o ne funkcijas: laikmatis ir aura persikėlė į
+// Priepuolius, todėl abu žingsniai eina po to skirtuko pristatymo. Užrašų
+// žingsnio nebėra kartu su skirtuku.
 const TOUR_STEPS = (t) => [
-  { el: "seiz", text: t.tour1, tab: "meds" },
-  { el: "aura", text: t.tour2, tab: "meds" },
   { el: "addMed", text: t.tour3, tab: "meds" },
   { el: "tab-seizures", text: t.tour4, tab: "seizures" },
+  { el: "seiz", text: t.tour1, tab: "seizures" },
+  { el: "aura", text: t.tour2, tab: "seizures" },
   { el: "tab-calendar", text: t.tour5, tab: "calendar" },
   { el: "tab-state", text: t.tour6, tab: "state" },
-  { el: "tab-notes", text: t.tour7, tab: "notes" },
   { el: "report", text: t.tour8, tab: "meds" },
 ];
 
@@ -2250,7 +2285,6 @@ const TABS = [
   { id: "seizures", key: "tSeiz", icon: Zap },
   { id: "calendar", key: "tCal", icon: CalendarDays },
   { id: "state", key: "segState", icon: Activity },
-  { id: "notes", key: "tNotes", icon: NotebookPen },
 ];
 
 export default function App() {
@@ -2288,7 +2322,7 @@ export default function App() {
     (async () => {
       try {
         const p = await loadData();
-        if (p) setData({ ...DEFAULT_DATA, ...p, settings: { ...DEFAULT_DATA.settings, ...(p.settings || {}) } });
+        if (p) setData(hydrate(p));
       } catch (e) { /* dar nėra įrašų */ }
       setLoaded(true);
       hideSplash();
@@ -2364,8 +2398,28 @@ export default function App() {
   const notify = data.settings?.notify !== false;
   useEffect(() => {
     if (!loaded) return;
-    initChannel(t).then(() => syncMedReminders(data.meds, data.doseLog, t, notify));
+    Promise.all([initChannel(t), initActions(t)])
+      .then(() => syncMedReminders(data.meds, data.doseLog, t, notify));
   }, [loaded, medSig, lang, notify, dayTick]);
+
+  // „Išgėriau“ paspaudus pačiame pranešime.
+  //
+  // Registruojam tik po `loaded`: paleidžiant programėlę iš pranešimo įvykis
+  // pristatomas, kai atsiranda klausytojas, o `loadData()` yra asinchroninis.
+  // Anksti pažymėta dozė būtų perrašyta įkeltais duomenimis ir tyliai dingtų.
+  useEffect(() => {
+    if (!loaded) return;
+    return onDoseAction(({ medId, time, dk }) => {
+      update((d) => {
+        const day = { ...(d.doseLog[dk] || {}) };
+        const k = `${medId}@${time}`;
+        if (!day[k]) day[k] = new Date().toISOString();
+        d.doseLog[dk] = day;
+        return d;
+      });
+      cancelDose(medId, time, dk);   // nutildom šios dozės pakartojimą po 30 min
+    });
+  }, [loaded]);
 
   // 4.1: skaičiuojam paleidimus – po vieną kartą kiekvienam
   const counted = useRef(false);
@@ -2375,7 +2429,7 @@ export default function App() {
     update((d) => { d.settings = { ...d.settings, opens: (d.settings?.opens || 0) + 1 }; return d; });
   }, [loaded]);
 
-  const entries = data.seizures.length + (data.auraEvents || []).length + data.notes.length;
+  const entries = data.seizures.length + (data.auraEvents || []).length;
   const showFbCard = loaded
     && data.settings?.fbCard === "pending"
     && (data.settings?.opens || 0) >= 3
@@ -2398,7 +2452,7 @@ export default function App() {
     if (!loaded || tourInit.current) return;
     tourInit.current = true;
     if (data.settings?.tour === "done") return;
-    const hasData = data.meds.length || data.seizures.length || data.notes.length;
+    const hasData = data.meds.length || data.seizures.length || Object.keys(data.daily).length;
     // jau naudojančiam programėlę ir nustatymas, ir apžvalga būtų žingsnis atgal
     if (hasData) {
       update((d) => { d.settings = { ...d.settings, tour: "done", setup: "done" }; return d; });
@@ -2505,7 +2559,7 @@ export default function App() {
     setTab("seizures");
   };
 
-  const View = { meds: MedsView, seizures: SeizuresView, calendar: CalendarView, state: StateView, notes: NotesView }[tab];
+  const View = { meds: MedsView, seizures: SeizuresView, calendar: CalendarView, state: StateView }[tab];
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.ink, fontFamily: T.body, display: "flex", justifyContent: "center" }}>
@@ -2578,7 +2632,7 @@ export default function App() {
       )}
       {showBreathe && <BreatheSheet data={data} update={update} t={t} onClose={() => setShowBreathe(false)} />}
       {showBackup && <BackupSheet t={t} onClose={() => setShowBackup(false)}
-        onRestored={async () => { const p = await loadData(); if (p) setData({ ...DEFAULT_DATA, ...p, settings: { ...DEFAULT_DATA.settings, ...(p.settings || {}) } }); }} />}
+        onRestored={async () => { const p = await loadData(); if (p) setData(hydrate(p)); }} />}
       {showFeedback && <FeedbackSheet data={data} t={t} onClose={() => setShowFeedback(false)} />}
 
       <div style={{

@@ -24,8 +24,15 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
+      # compileSdk 35 build-tools Gradle parsisiunčia pats, bet tik jei licencija
+      # priimta — kitaip lūžis su nieko nesakančiu pranešimu
+      - name: Accept SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+      # ci, ne install: „install" gali tyliai pakelti ^ versijas ir CI lūžtų dėl
+      # priežasties, kurios lokaliai nėra
       - name: Install deps
-        run: npm install
+        run: npm ci
 
       - name: Build web assets
         run: npm run build
@@ -62,8 +69,10 @@ jobs:
       # Be šito APK gautų numatytąją Capacitor piktogramą: assets/ katalogas pats
       # savaime niekur nepatenka. Įrankis ieško būtent icon-only / icon-foreground /
       # icon-background / splash / splash-dark vardų.
+      # Kviečiama bin vardu (capacitor-assets), ne paketo vardu: paketo vardas su
+      # bin vardu nesutampa, o npx elgsena tokiu atveju priklauso nuo npm versijos.
       - name: Generate launcher icons and splash
-        run: npx @capacitor/assets generate --android
+        run: npx capacitor-assets generate --android
 
       - name: Install notification icons
         run: |
@@ -108,10 +117,23 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
+      # Gradle report'as yra vienintelis dalykas, likęs po lūžusio build'o
+      - name: Upload build reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-reports
+          path: android/app/build/reports/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      # be if-no-files-found: error job'as būtų žalias su tuščiu artifact'u,
+      # jei APK kada nors atsidurtų kitame kelyje
       - uses: actions/upload-artifact@v4
         with:
           name: aura-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
+          if-no-files-found: error

@@ -6,6 +6,8 @@ export const isNative = () => Capacitor.isNativePlatform();
 const isAndroid = () => Capacitor.getPlatform() === "android";
 
 export const FOLLOWUP_MIN = 30;
+export const DOSE_ACTION_TYPE = "meds-dose";
+export const DOSE_ACTION_TAKEN = "taken";
 const BACKUP_ID = 2000000001;   // notifId grąžina 0…1999999999, tad čia susidūrimas neįmanomas
 const BED_BASE = 2000000100;    // 14 iš eilės einančių ID, po vieną kiekvienai dienai
 const BED_DAYS = 14;
@@ -24,6 +26,47 @@ export async function requestPermission() {
   if (!isNative()) return false;
   const p = await LocalNotifications.requestPermissions();
   return p.display === "granted";
+}
+
+/**
+ * Veiksmo mygtukas „Išgėriau“ pačiame pranešime.
+ *
+ * Be jo dozės pažymėjimas kainuoja keturis veiksmus: atrakinti telefoną,
+ * atidaryti Aurą, surasti dozę, paspausti. Realiai tabletė išgeriama, o
+ * pažymėjimas neįvyksta — ir ataskaitoje tai atrodo identiškai kaip praleista
+ * dozė. Vienintelis skaičius, dėl kurio programėlė egzistuoja, krypsta žemyn
+ * be jokios priežasties.
+ *
+ * Registruoti PRIVALOMA prieš planavimą: `actionTypeId`, nurodantis
+ * neužregistruotą tipą, tyliai lieka be mygtuko.
+ */
+export async function initActions(t) {
+  if (!isNative()) return;
+  try {
+    await LocalNotifications.registerActionTypes({
+      types: [{ id: DOSE_ACTION_TYPE, actions: [{ id: DOSE_ACTION_TAKEN, title: t.n.actTaken }] }],
+    });
+  } catch (e) { /* nepalaikoma – priminimas lieka be mygtuko, bet ateina */ }
+}
+
+/**
+ * Praneša, kad vartotojas paspaudė „Išgėriau“.
+ *
+ * `extra` yra vienintelis kelias atgal į dozę: pranešimo ID yra `notifId`
+ * maiša, o iš jos medId, laiko ir datos neatstatysi.
+ *
+ * Klausytoją registruoti galima ir vėliau nei įvyksta paspaudimas —
+ * paleidžiant programėlę iš pranešimo įvykis pristatomas tada, kai atsiranda
+ * kas jį priima. Tuo naudojamasi: laukiam, kol duomenys bus įkelti.
+ */
+export function onDoseAction(cb) {
+  if (!isNative()) return () => {};
+  const h = LocalNotifications.addListener("localNotificationActionPerformed", (ev) => {
+    if (ev.actionId !== DOSE_ACTION_TAKEN) return;
+    const x = ev.notification && ev.notification.extra;
+    if (x && x.medId && x.time && x.dk) cb(x);
+  });
+  return () => { Promise.resolve(h).then((s) => s && s.remove()).catch(() => {}); };
 }
 
 export async function pendingCount() {
@@ -71,7 +114,10 @@ export function planNotifications(meds, doseLog, t, now = new Date()) {
       for (const time of m.times) {
         if (taken[`${m.id}@${time}`]) continue;   // jau išgerta – nei priminimo, nei pakartojimo
         const at = doseAt(day, time);
-        const base = { channelId: "meds", smallIcon: "ic_stat_aura" };
+        const base = {
+          channelId: "meds", smallIcon: "ic_stat_aura",
+          actionTypeId: DOSE_ACTION_TYPE, extra: { medId: m.id, time, dk },
+        };
         if (at > now) {
           out.push({
             ...base, id: notifId(doseKey(m.id, time, dk)),
@@ -131,7 +177,10 @@ export async function restoreDose(med, time, dk, t) {
   const at = doseAt(new Date(dk.replace(/-/g, "/")), time);
   const fu = new Date(at.getTime() + FOLLOWUP_MIN * 60000);
   const now = new Date();
-  const base = { channelId: "meds", smallIcon: "ic_stat_aura" };
+  const base = {
+    channelId: "meds", smallIcon: "ic_stat_aura",
+    actionTypeId: DOSE_ACTION_TYPE, extra: { medId: med.id, time, dk },
+  };
   const notifications = [];
   if (at > now) notifications.push({ ...base, id: notifId(doseKey(med.id, time, dk)), title: t.n.title, body: t.n.body(med), schedule: { at, allowWhileIdle: true } });
   if (fu > now) notifications.push({ ...base, id: notifId(followKey(med.id, time, dk)), title: t.n.fuTitle, body: t.n.fuBody(med), schedule: { at: fu, allowWhileIdle: true } });
