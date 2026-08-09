@@ -115,54 +115,54 @@ const STR = {
     newMed: "Naujas vaistas", medName: "Pavadinimas, pvz. Levetiracetamas", medDose: "Dozė, pvz. 500 mg",
     times: "Vartojimo laikai", addTime: "Pridėti laiką", removeTime: "Pašalinti laiką", saveMed: "Išsaugoti vaistą",
     todayIs: "Šiandien", medsEmptyT: "Kol kas tuščia",
-    medsEmptyB: "Pridėk vaistą su vartojimo laikais — dienos dozes pažymėsi vienu paspaudimu.",
-    taken: (a, b) => `Išgerta ${a} iš ${b} dozių šiandien`, allDone: " — viskas ✓",
+    medsEmptyB: "Pridėk vaistą su vartojimo laikais, ir dienos dozes pažymėsi vienu paspaudimu.",
+    taken: (a, b) => `Išgerta ${a} iš ${b} dozių šiandien`, allDone: " · viskas ✓",
     last7: "Paskutinės 7 dienos", addMed: "Pridėti vaistą", missed: "praleista?", dose: "Dozė",
     regSeiz: "Registruoti priepuolį", per30: "per 30 d.", daysSince: "d. be priepuolio", diary: "Dienynas",
-    seizEmpty: "Įrašų nėra. Registruok kiekvieną priepuolį — dienynas neurologui vertingesnis už atmintį.",
+    seizEmpty: "Įrašų nėra. Registruok kiekvieną priepuolį: dienynas neurologui vertingesnis už atmintį.",
     type: "Tipas", duration: "Trukmė", auraYes: "Aura buvo ✓", auraNo: "Auros nebuvo", withAura: "su aura",
     effects: "Pasekmės", triggers: "Galimi trigeriai",
     seizNote: "Pastabos (kaip jauteisi po, kas matė…)", saveEntry: "Išsaugoti įrašą",
-    statusWarn: "Ilgesnis nei 5 min priepuolis gali būti status epilepticus — būtina skubi pagalba (112).",
+    statusWarn: "Ilgesnis nei 5 min priepuolis gali būti status epilepticus. Būtina skubi pagalba (112).",
     newEvent: "Naujas įrašas kalendoriuje", eventWhat: "Kas? pvz. Užeiti pas tėvus",
-    timeOptional: "Laikas nebūtinas — be jo įrašas bus „visą dieną“.",
+    timeOptional: "Laikas nebūtinas. Be jo įrašas bus „visą dieną“.",
     saveEvent: "Įrašyti į kalendorių", noEventsDay: "Šią dieną įrašų nėra.", addForDay: "Pridėti šiai dienai", upcoming: "Artimiausi", prepare: "Pasiruošk", inhale: "Įkvėpk", hold: "Sulaikyk", exhale: "Iškvėpk",
     pBox: "Dėžutė 4·4·4·4", pRelax: "Ramybei 4·7·8", start: "Pradėti", stop: "Stabdyti",
-    remaining: (n) => `liko ${n} min`, doneMin: (n) => `Baigta — ${n} min ✓`, stoppedMin: (n) => `Sustabdyta — ${n} min įrašyta`, sessions: "seansai", minTotal: "min iš viso",
+    remaining: (n) => `liko ${n} min`, doneMin: (n) => `Baigta · ${n} min ✓`, stoppedMin: (n) => `Sustabdyta · ${n} min įrašyta`, sessions: "seansai", minTotal: "min iš viso",
     segState: "Būsena",
     todayState: "Šiandienos būsena", sleep: "Miegas", stress: "Stresas", fatigue: "Nuovargis", alcohol: "Alkoholis",
     yes: "Taip", no: "Ne", optNote: "Pastaba (nebūtina)", autosave: "Įrašoma automatiškai.",
-    sleep7: "Miegas per 7 d.", sleepHint: "Mažiau nei 6 h — vienas dažniausių priepuolių trigerių.",
+    sleep7: "Miegas per 7 d.", sleepHint: "Mažiau nei 6 h yra vienas dažniausių priepuolių trigerių.",
     rNotes: "Pastabos",
     report: "Ataskaita gydytojui", rSeiz: "Priepuoliai", rTypes: "Tipai", rAura: "Su aura",
     rLongest: "Ilgiausia trukmė", rAdh: "Vaistų laikymasis", rSleep: "Miegas", rSleepV: (a, s, n) => `vid. ${a} h · <6 h: ${s}/${n}`,
     rStressFat: "Stresas / nuovargis", rOf5: "(iš 5)", rAlco: "Alkoholis", rDays: (n) => `${n} d.`, copyText: "Kopijuoti kaip tekstą",
-    rNote: "Vaistų laikymasis skaičiuojamas pagal dabartinį vaistų sąrašą, todėl laikotarpiui iki vaisto pridėjimo — apytikslis.",
-    rTitle: (n) => `AURA — ${n} d. ataskaita`, rPatient: "Pacientas", rFooter: "Duomenys registruoti paties paciento programėle Aura.",
+    rNote: "Vaistų laikymasis skaičiuojamas pagal dabartinį vaistų sąrašą, todėl laikotarpiui iki vaisto pridėjimo jis apytikslis.",
+    rTitle: (n) => `AURA · ${n} d. ataskaita`, rPatient: "Pacientas", rFooter: "Duomenys registruoti paties paciento programėle Aura.",
     rAdhLine: (p, t, s) => `VAISTAI: laikymasis ~${p}% (${t} iš ${s} dozių)`,
     setupIntro: "Kelios sekundės, ir galim pradėti. Visa tai vėliau pakeisi Nustatymuose.", setupName: "Kaip į tave kreiptis?", setupNameHint: "Neprivaloma. Vardas rodomas tik ataskaitoje gydytojui.", setupNotify: "Vaistų priminimai", setupNotifyDesc: "Priminsim išgerti dozę tavo nurodytu laiku. Galima įjungti ir vėliau.", setupStart: "Pradėti", setupLocal: "Paskyros nėra. Viskas lieka šiame telefone.", settings: "Nustatymai", language: "Kalba", replayTour: "Peržiūrėti apžvalgą", theme: "Išvaizda", bed: "Miego priminimas", bedDesc: "Priminsim ruoštis miegoti tavo pasirinktu laiku.", thLight: "Šviesi", thDark: "Tamsi", thAuto: "Automatinė", profile: "Profilis", namePh: "Vardas (rodomas ataskaitoje)",
     overdueAfter: "Dozė žymima „praleista?“ po:", data: "Duomenys", exportJson: "Eksportuoti duomenis (JSON)",
     deleteAll: "Ištrinti visus duomenis", confirmAll: "Tikrai ištrinti viską? Negrįžtama", about: "Apie",
-    aboutText: "Aura · prototipas v1.4. Duomenys saugomi tik šiame telefone. Programėlė nėra medicinos prietaisas — priepuolių detekcijai naudok sertifikuotus įrenginius, o skubiai informacijai užsipildyk telefono Medical ID.",
+    aboutText: "Aura · prototipas v1.4. Duomenys saugomi tik šiame telefone. Programėlė nėra medicinos prietaisas. Priepuolių detekcijai naudok sertifikuotus įrenginius, o skubiai informacijai užsipildyk telefono Medical ID.",
     aura: "Aura", edit: "Redaguoti", editSeiz: "Redaguoti priepuolį", editEvent: "Redaguoti įrašą",
     unanswered: "neatsakyta", rAnswered: (a, b) => `atsakyta ${a} iš ${b}`,
     sum30: "Per 30 dienų", sumSeiz: "priepuoliai", sumAdh: "vaistų", sumSleep: "miegas",
-    sumDemo: "Pavyzdys — čia atsiras tavo duomenys",
+    sumDemo: "Pavyzdys: čia atsiras tavo duomenys",
     sumWhy: "Bloknotas kaupia įrašus. Aura iš jų suskaičiuoja tai, ko gydytojui reikia: vaistų laikymosi procentą, trigerius pagal dažnį ir miegą prieš priepuolius.",
     sumOpen: "Atidaryti ataskaitą",
     stTaken: "Išgerta", stLate: "Vėluoja", stSoon: "Laukia",
-    fbLabel: "Atsiliepimas", fbBtn: "Rašyti kūrėjui", fbSubj: "Aura — atsiliepimas",
-    fbNote: "Atsidarys tavo el. pašto programa. Prisegama tik versija ir įrenginio tipas — dienyno įrašai nesiunčiami.",
+    fbLabel: "Atsiliepimas", fbBtn: "Rašyti kūrėjui", fbSubj: "Aura: atsiliepimas",
+    fbNote: "Atsidarys tavo el. pašto programa. Prisegama tik versija ir įrenginio tipas, dienyno įrašai nesiunčiami.",
     pause: "Pauzė", resume: "Tęsti", paused: "Pristabdyta", quickLog: "Registruoti priepuolį",
     editMed: "Redaguoti vaistą", rAdhDays: (a, b) => `skaičiuota ${a} iš ${b} d.`,
     auraKinds: "Kaip aura pasireiškė?", auraNew: "Pridėti savo aprašymą", rAuraKinds: "Auros pasireiškimas",
-    auraHint: "Įrašyk savo žodžiais — auros turinys neurologui pasako, kurioje smegenų vietoje priepuolis prasideda.",
+    auraHint: "Įrašyk savo žodžiais. Auros turinys neurologui pasako, kurioje smegenų vietoje priepuolis prasideda.",
     fbBug: "Klaida", fbIdea: "Pasiūlymas", fbOther: "Kita",
-    fbPh: "Kas nutiko arba ką norėtum pakeisti? Jei tai klaida — kaip ją pakartoti?",
+    fbPh: "Kas nutiko arba ką norėtum pakeisti? Jei tai klaida, kaip ją pakartoti?",
     fbAttach: "Bus prisegta", fbSend: "Siųsti", fbCopy: "Kopijuoti tekstą",
     fbSent: "Atsidarė pašto programa", fbFallback: "Jei pašto programa neatsidarė, nukopijuok tekstą ir atsiųsk į", fbNoText: "Įrašyk, kas nutiko",
     backup: "Atsarginė kopija", bkMake: "Sukurti kopiją", bkRestore: "Atkurti iš kopijos",
-    bkHint: "Failas su visais duomenimis. Išsaugok jį sau — pametus telefoną tai vienintelis kelias atgauti dienyną.",
+    bkHint: "Failas su visais duomenimis. Išsaugok jį sau: pametus telefoną tai vienintelis kelias atgauti dienyną.",
     bkDone: "Kopija sukurta", bkFail: "Nepavyko sukurti kopijos",
     bkRemind: "Priminti kas mėnesį", bkChecking: "Tikrinama…",
     bkFound: "Rasta kopija", bkFrom: "Sukurta", bkWill: "Bus atkurta",
@@ -172,7 +172,7 @@ const STR = {
     bkErrNewer: "Kopija sukurta naujesne programėlės versija. Atnaujink Aurą.",
     bkErrEmpty: "Kopija tuščia.",
     seizStart: "Prasidėjo priepuolis", seizEnd: "Priepuolis baigėsi", seizRunning: "Vyksta priepuolis",
-    seizAlert: "Užsitęsęs priepuolis — kvieskite pagalbą (112)",
+    seizAlert: "Užsitęsęs priepuolis. Kvieskite pagalbą (112)",
     seizAlertNote: "Programėlė neskambina pati.",
     seizStale: "Ar priepuolis jau baigėsi?",
     seizStaleNote: "Laikmatis veikia ilgiau nei valandą. Jei pamiršai jį sustabdyti, trukmė bus netiksli.",
@@ -180,19 +180,20 @@ const STR = {
     measured: "išmatuota", startedAt: "Pradžia",
     auraFeel: "Jaučiu aurą", auraLogged: "Aura užfiksuota", auraLinked: "Susieta su aura prieš {n} min.",
     breathe: "Kvėpavimas", breatheNote: "Atsipalaidavimo pratimas.", close: "Uždaryti", trigOtherPh: "Įrašyk savo žodžiais",
-    fbCardText: "Aura — mano asmeninis projektas, kuriamas laisvalaikiu. Jei kažko trūksta arba kažkas veikia blogai, parašyk — tai vienintelis būdas man sužinoti.",
+    fbCardText: "Aura yra mano asmeninis projektas, kuriamas laisvalaikiu. Jei kažko trūksta arba kažkas veikia blogai, parašyk: tai vienintelis būdas man sužinoti.",
     fbCardYes: "Parašyti", fbCardNo: "Ne dabar",
     // Pirmo paleidimo apžvalga: po vieną eilutę. Ilgesnis tekstas čia neskaitomas —
     // žmogus ką tik atsidarė programėlę ir dar nežino, ar jam jos reikia.
     tourNext: "Toliau", tourDone: "Pradėti", tourSkip: "Praleisti",
-    tour1: "Laikmatis matuoja pats — trukmės rašyti nereikia.",
-    tour2: "Pajutai aurą? Pažymėk čia.",
-    tour3: "Pridėk vaistus — priminsim laiku.",
-    tour4: "Visi priepuoliai vienoje vietoje.",
-    tour5: "Kalendorius — priepuolių raštas per mėnesį.",
-    tour6: "Būsena: miegas, stresas, nuovargis.",
-    tour8: "30 dienų suvestinė gydytojui. Dėl jos viskas ir renkama.",
-    gNotif: "Priminimai neateina laiku", gNotifB: "Priminimai atiduodami telefono žadintuvų sistemai iki 14 dienų į priekį, todėl Aurai veikti nereikia. Jei žinutė pasirodo tik tada, kai atidarai programėlę, ją stabdo telefono energijos taupymas. Griežčiausi čia yra Xiaomi, Huawei, Samsung ir OnePlus.\n\nPirmiausia patikrink, ar priminimai apskritai suplanuoti: Nustatymai → Suplanuota priminimų → Tikrinti. Jei rodo 0, telefonas juos panaikino. Jei rodo didelį skaičių, o žinutė vis tiek vėluoja — priminimai sukurti teisingai, tik telefonas neleidžia jų parodyti.\n\nAbiem atvejais padeda tie patys nustatymai. Pavadinimai priklauso nuo telefono, bet keliai panašūs:\n\n1. Baterijos taupymas → Be apribojimų. Nustatymai → Programos → Programų tvarkyklė → Aura → Baterijos taupymas. Tai svarbiausias žingsnis — kol čia lieka taupymo režimas, telefonas stabdo priminimus, kad ir ką pakeistum kitur.\n\n2. Automatinis paleidimas (Autostart) — įjungti. Toje pačioje Auros kortelėje. Xiaomi jį išjungia pagal nutylėjimą.\n\n3. Paskutinių programėlių ekrane užrakink Aurą spynele. Kitaip „Išvalyti viską“ panaikina visus suplanuotus priminimus.\n\n4. Žadintuvai ir priminimai — leisti. Nustatymai → Programos → Speciali prieiga.\n\nPakeitęs palik telefoną kelioms valandoms ir pažiūrėk, ar priminimas ateina laiku pats.",
+    tourNav: "Keturi skirtukai. Apžvelgsim visus iš eilės.",
+    tourTimer: "Laikmatis matuoja pats, trukmės rašyti nereikia.",
+    tourAura: "Pajutai aurą? Pažymėk čia.",
+    tourLog: "Praėjusį priepuolį įrašyk čia, laikmačio nereikia.",
+    tourMeds: "Pridėk vaistus. Priminsim laiku, o dozę pažymėsi tiesiai pranešime.",
+    tourCal: "Priepuolių raštas per mėnesį. Brūkšneliai žymi priepuolius, o taškai žymi tavo įrašus.",
+    tourState: "Miegas, stresas, nuovargis ir pastaba. Pastaba keliauja į ataskaitą.",
+    tourReport: "30 dienų suvestinė gydytojui. Dėl jos viskas ir renkama.",
+    gNotif: "Priminimai neateina laiku", gNotifB: "Priminimai atiduodami telefono žadintuvų sistemai iki 14 dienų į priekį, todėl Aurai veikti nereikia. Jei žinutė pasirodo tik tada, kai atidarai programėlę, ją stabdo telefono energijos taupymas. Griežčiausi čia yra Xiaomi, Huawei, Samsung ir OnePlus.\n\nPirmiausia patikrink, ar priminimai apskritai suplanuoti: Nustatymai → Suplanuota priminimų → Tikrinti. Jei rodo 0, telefonas juos panaikino. Jei rodo didelį skaičių, o žinutė vis tiek vėluoja, vadinasi priminimai sukurti teisingai, tik telefonas neleidžia jų parodyti.\n\nAbiem atvejais padeda tie patys nustatymai. Pavadinimai priklauso nuo telefono, bet keliai panašūs:\n\n1. Baterijos taupymas → Be apribojimų. Nustatymai → Programos → Programų tvarkyklė → Aura → Baterijos taupymas. Tai svarbiausias žingsnis: kol čia lieka taupymo režimas, telefonas stabdo priminimus, kad ir ką pakeistum kitur.\n\n2. Automatinis paleidimas (Autostart): įjungti. Toje pačioje Auros kortelėje. Xiaomi jį išjungia pagal nutylėjimą.\n\n3. Paskutinių programėlių ekrane užrakink Aurą spynele. Kitaip „Išvalyti viską“ panaikina visus suplanuotus priminimus.\n\n4. Žadintuvai ir priminimai: leisti. Nustatymai → Programos → Speciali prieiga.\n\nPakeitęs palik telefoną kelioms valandoms ir pažiūrėk, ar priminimas ateina laiku pats.",
     change: "Keisti pratimą",
     ty: { tonicClonic: "Toninis-kloninis", absence: "Absansas", focal: "Židininis", myoclonic: "Miokloninis", other: "Kitas", unspec: "Nenurodyta" },
     ef: { fall: "Nukritau", injury: "Susižalojau", tongue: "Prikandau liežuvį", incontinence: "Šlapimo nelaikymas" },
@@ -209,54 +210,54 @@ const STR = {
     newMed: "New medication", medName: "Name, e.g. Levetiracetam", medDose: "Dose, e.g. 500 mg",
     times: "Dose times", addTime: "Add time", removeTime: "Remove time", saveMed: "Save medication",
     todayIs: "Today", medsEmptyT: "Nothing here yet",
-    medsEmptyB: "Add a medication with its times — then mark each dose with a single tap.",
-    taken: (a, b) => `Taken ${a} of ${b} doses today`, allDone: " — all done ✓",
+    medsEmptyB: "Add a medication with its times, then mark each dose with a single tap.",
+    taken: (a, b) => `Taken ${a} of ${b} doses today`, allDone: " · all done ✓",
     last7: "Last 7 days", addMed: "Add medication", missed: "missed?", dose: "Dose",
     regSeiz: "Log a seizure", per30: "in 30 d.", daysSince: "d. seizure-free", diary: "Diary",
-    seizEmpty: "No entries yet. Log every seizure — a diary is worth more to your neurologist than memory.",
+    seizEmpty: "No entries yet. Log every seizure: a diary is worth more to your neurologist than memory.",
     type: "Type", duration: "Duration", auraYes: "Aura present ✓", auraNo: "No aura", withAura: "with aura",
     effects: "Consequences", triggers: "Possible triggers",
     seizNote: "Notes (how you felt after, who witnessed it…)", saveEntry: "Save entry",
-    statusWarn: "A seizure longer than 5 min may be status epilepticus — call emergency services immediately.",
+    statusWarn: "A seizure longer than 5 min may be status epilepticus. Call emergency services immediately.",
     newEvent: "New calendar entry", eventWhat: "What? e.g. Visit my parents",
-    timeOptional: "Time is optional — without it the entry is “all day”.",
+    timeOptional: "Time is optional. Without it the entry is “all day”.",
     saveEvent: "Add to calendar", noEventsDay: "No entries on this day.", addForDay: "Add for this day", upcoming: "Upcoming", prepare: "Get ready", inhale: "Breathe in", hold: "Hold", exhale: "Breathe out",
     pBox: "Box 4·4·4·4", pRelax: "Calming 4·7·8", start: "Start", stop: "Stop",
-    remaining: (n) => `${n} min left`, doneMin: (n) => `Done — ${n} min ✓`, stoppedMin: (n) => `Stopped — ${n} min saved`, sessions: "sessions", minTotal: "min total",
+    remaining: (n) => `${n} min left`, doneMin: (n) => `Done · ${n} min ✓`, stoppedMin: (n) => `Stopped · ${n} min saved`, sessions: "sessions", minTotal: "min total",
     segState: "State",
     todayState: "Today's state", sleep: "Sleep", stress: "Stress", fatigue: "Fatigue", alcohol: "Alcohol",
     yes: "Yes", no: "No", optNote: "Note (optional)", autosave: "Saved automatically.",
-    sleep7: "Sleep over 7 days", sleepHint: "Under 6 h — one of the most common seizure triggers.",
+    sleep7: "Sleep over 7 days", sleepHint: "Under 6 h is one of the most common seizure triggers.",
     rNotes: "Notes",
     report: "Report for doctor", rSeiz: "Seizures", rTypes: "Types", rAura: "With aura",
     rLongest: "Longest duration", rAdh: "Medication adherence", rSleep: "Sleep", rSleepV: (a, s, n) => `avg ${a} h · <6 h: ${s}/${n}`,
     rStressFat: "Stress / fatigue", rOf5: "(of 5)", rAlco: "Alcohol", rDays: (n) => `${n} d.`, copyText: "Copy as text",
     rNote: "Adherence is calculated from your current medication list, so it is approximate for periods before a medication was added.",
-    rTitle: (n) => `AURA — ${n}-day report`, rPatient: "Patient", rFooter: "Data self-recorded by the patient using the Aura app.",
+    rTitle: (n) => `AURA · ${n}-day report`, rPatient: "Patient", rFooter: "Data self-recorded by the patient using the Aura app.",
     rAdhLine: (p, t, s) => `MEDICATION: adherence ~${p}% (${t} of ${s} doses)`,
     setupIntro: "A few seconds and we can begin. All of this can be changed later in Settings.", setupName: "What should we call you?", setupNameHint: "Optional. The name appears only in the doctor’s report.", setupNotify: "Medication reminders", setupNotifyDesc: "We will remind you to take a dose at the times you enter. You can turn this on later too.", setupStart: "Get started", setupLocal: "There is no account. Everything stays on this phone.", settings: "Settings", language: "Language", replayTour: "Replay the tour", theme: "Appearance", bed: "Bedtime reminder", bedDesc: "A nudge to start winding down at the time you choose.", thLight: "Light", thDark: "Dark", thAuto: "Automatic", profile: "Profile", namePh: "Name (shown in the report)",
     overdueAfter: "Mark a dose as “missed?” after:", data: "Data", exportJson: "Export data (JSON)",
     deleteAll: "Delete all data", confirmAll: "Delete everything? This cannot be undone", about: "About",
-    aboutText: "Aura · prototype v1.4. Data is stored only on this phone. This app is not a medical device — use certified devices for seizure detection, and fill in your phone's Medical ID for emergencies.",
+    aboutText: "Aura · prototype v1.4. Data is stored only on this phone. This app is not a medical device. Use certified devices for seizure detection, and fill in your phone's Medical ID for emergencies.",
     aura: "Aura", edit: "Edit", editSeiz: "Edit seizure", editEvent: "Edit entry",
     unanswered: "not answered", rAnswered: (a, b) => `answered ${a} of ${b}`,
     sum30: "Last 30 days", sumSeiz: "seizures", sumAdh: "meds", sumSleep: "sleep",
-    sumDemo: "Example — your data will appear here",
+    sumDemo: "Example: your data will appear here",
     sumWhy: "A notepad collects entries. Aura turns them into what your doctor needs: adherence percentage, triggers ranked by frequency, and sleep before seizures.",
     sumOpen: "Open report",
     stTaken: "Taken", stLate: "Late", stSoon: "Due",
-    fbLabel: "Feedback", fbBtn: "Email the developer", fbSubj: "Aura — feedback",
-    fbNote: "Opens your email app. Only the version and device type are attached — no diary entries are sent.",
+    fbLabel: "Feedback", fbBtn: "Email the developer", fbSubj: "Aura: feedback",
+    fbNote: "Opens your email app. Only the version and device type are attached, no diary entries are sent.",
     pause: "Pause", resume: "Resume", paused: "Paused", quickLog: "Log a seizure",
     editMed: "Edit medication", rAdhDays: (a, b) => `over ${a} of ${b} d.`,
     auraKinds: "How did the aura present?", auraNew: "Add your own description", rAuraKinds: "Aura presentation",
-    auraHint: "Use your own words — what the aura feels like tells your neurologist where the seizure starts.",
+    auraHint: "Use your own words. What the aura feels like tells your neurologist where the seizure starts.",
     fbBug: "Bug", fbIdea: "Idea", fbOther: "Other",
-    fbPh: "What happened, or what would you change? If it is a bug — how do you reproduce it?",
+    fbPh: "What happened, or what would you change? If it is a bug, how do you reproduce it?",
     fbAttach: "Will be attached", fbSend: "Send", fbCopy: "Copy text",
     fbSent: "Mail app opened", fbFallback: "If your mail app did not open, copy the text and send it to", fbNoText: "Describe what happened",
     backup: "Backup", bkMake: "Create backup", bkRestore: "Restore from backup",
-    bkHint: "A file with all your data. Keep it somewhere safe — if you lose the phone, this is the only way back.",
+    bkHint: "A file with all your data. Keep it somewhere safe: if you lose the phone, this is the only way back.",
     bkDone: "Backup created", bkFail: "Backup failed",
     bkRemind: "Remind monthly", bkChecking: "Checking…",
     bkFound: "Backup found", bkFrom: "Created", bkWill: "Will be restored",
@@ -266,7 +267,7 @@ const STR = {
     bkErrNewer: "This backup was made by a newer version. Please update Aura.",
     bkErrEmpty: "The backup is empty.",
     seizStart: "Seizure started", seizEnd: "Seizure ended", seizRunning: "Seizure in progress",
-    seizAlert: "Prolonged seizure — call emergency services",
+    seizAlert: "Prolonged seizure. Call emergency services",
     seizAlertNote: "The app does not dial for you.",
     seizStale: "Is the seizure over?",
     seizStaleNote: "The timer has been running for over an hour. If you forgot to stop it, the duration will be wrong.",
@@ -274,17 +275,18 @@ const STR = {
     measured: "measured", startedAt: "Started",
     auraFeel: "I feel an aura", auraLogged: "Aura logged", auraLinked: "Linked to an aura {n} min ago",
     breathe: "Breathing", breatheNote: "A relaxation exercise.", close: "Close", trigOtherPh: "Describe in your own words",
-    fbCardText: "Aura is my personal project, built in my spare time. If something is missing or something works badly, write to me — it is the only way I get to know.",
+    fbCardText: "Aura is my personal project, built in my spare time. If something is missing or something works badly, write to me: it is the only way I get to know.",
     fbCardYes: "Write to me", fbCardNo: "Not now",
     tourNext: "Next", tourDone: "Start", tourSkip: "Skip",
-    tour1: "The timer measures for you — no need to type a duration.",
-    tour2: "Feel an aura? Mark it here.",
-    tour3: "Add your medications — we'll remind you on time.",
-    tour4: "Every seizure in one place.",
-    tour5: "Calendar — your seizure pattern across the month.",
-    tour6: "Wellbeing: sleep, stress, fatigue.",
-    tour8: "A 30-day summary for your doctor. That is what all of this is for.",
-    gNotif: "Reminders arrive late", gNotifB: "Reminders are handed to the phone's alarm system up to 14 days ahead, so Aura does not need to be running. If a reminder only appears once you open the app, your phone's battery saver is holding it back. Xiaomi, Huawei, Samsung and OnePlus are the strictest.\n\nFirst check whether reminders were scheduled at all: Settings → Scheduled reminders → Check. If it shows 0, the phone deleted them. If it shows a large number and the reminder is still late, they were scheduled correctly and the phone is simply refusing to show them.\n\nThe same settings help in both cases. Names vary by phone, but the paths are similar:\n\n1. Battery saver → No restrictions. Settings → Apps → Manage apps → Aura → Battery saver. This is the one that matters most — while any saver mode is on, the phone holds reminders back no matter what else you change.\n\n2. Autostart — turn on. In the same Aura entry. Xiaomi disables it by default.\n\n3. Lock Aura in the recent apps screen. Otherwise “Clear all” wipes every scheduled reminder.\n\n4. Alarms & reminders — allow. Settings → Apps → Special app access.\n\nAfter changing these, leave the phone alone for a few hours and see whether a reminder arrives on its own.",
+    tourNav: "Four tabs. We'll go through all of them.",
+    tourTimer: "The timer measures for you, no need to type a duration.",
+    tourAura: "Feel an aura? Mark it here.",
+    tourLog: "Log a past seizure here, no timer needed.",
+    tourMeds: "Add your medications. We'll remind you on time, and you can mark a dose straight from the notification.",
+    tourCal: "Your seizure pattern across the month. Bars mark seizures, dots mark your own entries.",
+    tourState: "Sleep, stress, fatigue and a note. The note goes into the report.",
+    tourReport: "A 30-day summary for your doctor. That is what all of this is for.",
+    gNotif: "Reminders arrive late", gNotifB: "Reminders are handed to the phone's alarm system up to 14 days ahead, so Aura does not need to be running. If a reminder only appears once you open the app, your phone's battery saver is holding it back. Xiaomi, Huawei, Samsung and OnePlus are the strictest.\n\nFirst check whether reminders were scheduled at all: Settings → Scheduled reminders → Check. If it shows 0, the phone deleted them. If it shows a large number and the reminder is still late, they were scheduled correctly and the phone is simply refusing to show them.\n\nThe same settings help in both cases. Names vary by phone, but the paths are similar:\n\n1. Battery saver → No restrictions. Settings → Apps → Manage apps → Aura → Battery saver. This is the one that matters most: while any saver mode is on, the phone holds reminders back no matter what else you change.\n\n2. Autostart: turn on. In the same Aura entry. Xiaomi disables it by default.\n\n3. Lock Aura in the recent apps screen. Otherwise “Clear all” wipes every scheduled reminder.\n\n4. Alarms & reminders: allow. Settings → Apps → Special app access.\n\nAfter changing these, leave the phone alone for a few hours and see whether a reminder arrives on its own.",
     change: "Change exercise",
     ty: { tonicClonic: "Tonic-clonic", absence: "Absence", focal: "Focal", myoclonic: "Myoclonic", other: "Other", unspec: "Unspecified" },
     ef: { fall: "I fell", injury: "Injured myself", tongue: "Bit my tongue", incontinence: "Incontinence" },
@@ -301,54 +303,54 @@ const STR = {
     newMed: "Новое лекарство", medName: "Название, напр. Леветирацетам", medDose: "Доза, напр. 500 мг",
     times: "Время приёма", addTime: "Добавить время", removeTime: "Убрать время", saveMed: "Сохранить лекарство",
     todayIs: "Сегодня", medsEmptyT: "Пока пусто",
-    medsEmptyB: "Добавьте лекарство с временем приёма — отмечать дозы можно одним касанием.",
-    taken: (a, b) => `Принято ${a} из ${b} доз сегодня`, allDone: " — всё ✓",
+    medsEmptyB: "Добавьте лекарство с временем приёма, и отмечать дозы можно одним касанием.",
+    taken: (a, b) => `Принято ${a} из ${b} доз сегодня`, allDone: " · всё ✓",
     last7: "Последние 7 дней", addMed: "Добавить лекарство", missed: "пропущено?", dose: "Доза",
     regSeiz: "Записать приступ", per30: "за 30 д.", daysSince: "д. без приступов", diary: "Дневник",
-    seizEmpty: "Записей нет. Записывайте каждый приступ — дневник ценнее для невролога, чем память.",
+    seizEmpty: "Записей нет. Записывайте каждый приступ: дневник ценнее для невролога, чем память.",
     type: "Тип", duration: "Длительность", auraYes: "Аура была ✓", auraNo: "Ауры не было", withAura: "с аурой",
     effects: "Последствия", triggers: "Возможные триггеры",
     seizNote: "Заметки (как чувствовали себя после, кто видел…)", saveEntry: "Сохранить запись",
-    statusWarn: "Приступ дольше 5 минут может быть эпилептическим статусом — нужна срочная помощь (112).",
+    statusWarn: "Приступ дольше 5 минут может быть эпилептическим статусом. Нужна срочная помощь (112).",
     newEvent: "Новая запись в календаре", eventWhat: "Что? напр. Зайти к родителям",
-    timeOptional: "Время необязательно — без него запись будет «весь день».",
+    timeOptional: "Время необязательно. Без него запись будет «весь день».",
     saveEvent: "Добавить в календарь", noEventsDay: "В этот день записей нет.", addForDay: "Добавить на этот день", upcoming: "Ближайшие", prepare: "Приготовьтесь", inhale: "Вдох", hold: "Задержка", exhale: "Выдох",
     pBox: "Квадрат 4·4·4·4", pRelax: "Расслабление 4·7·8", start: "Начать", stop: "Остановить",
-    remaining: (n) => `осталось ${n} мин`, doneMin: (n) => `Готово — ${n} мин ✓`, stoppedMin: (n) => `Остановлено — ${n} мин записано`, sessions: "сеансы", minTotal: "мин всего",
+    remaining: (n) => `осталось ${n} мин`, doneMin: (n) => `Готово · ${n} мин ✓`, stoppedMin: (n) => `Остановлено · ${n} мин записано`, sessions: "сеансы", minTotal: "мин всего",
     segState: "Состояние",
     todayState: "Состояние сегодня", sleep: "Сон", stress: "Стресс", fatigue: "Усталость", alcohol: "Алкоголь",
     yes: "Да", no: "Нет", optNote: "Заметка (необязательно)", autosave: "Сохраняется автоматически.",
-    sleep7: "Сон за 7 дней", sleepHint: "Меньше 6 ч — один из самых частых триггеров приступов.",
+    sleep7: "Сон за 7 дней", sleepHint: "Меньше 6 ч, это один из самых частых триггеров приступов.",
     rNotes: "Заметки",
     report: "Отчёт для врача", rSeiz: "Приступы", rTypes: "Типы", rAura: "С аурой",
     rLongest: "Самый долгий", rAdh: "Соблюдение приёма", rSleep: "Сон", rSleepV: (a, s, n) => `сред. ${a} ч · <6 ч: ${s}/${n}`,
     rStressFat: "Стресс / усталость", rOf5: "(из 5)", rAlco: "Алкоголь", rDays: (n) => `${n} д.`, copyText: "Скопировать как текст",
     rNote: "Соблюдение приёма считается по текущему списку лекарств, поэтому для периода до добавления лекарства оно приблизительно.",
-    rTitle: (n) => `AURA — отчёт за ${n} д.`, rPatient: "Пациент", rFooter: "Данные записаны самим пациентом в приложении Aura.",
+    rTitle: (n) => `AURA · отчёт за ${n} д.`, rPatient: "Пациент", rFooter: "Данные записаны самим пациентом в приложении Aura.",
     rAdhLine: (p, t, s) => `ЛЕКАРСТВА: соблюдение ~${p}% (${t} из ${s} доз)`,
     setupIntro: "Несколько секунд, и можно начинать. Всё это позже можно изменить в настройках.", setupName: "Как к вам обращаться?", setupNameHint: "Необязательно. Имя показывается только в отчёте врачу.", setupNotify: "Напоминания о лекарствах", setupNotifyDesc: "Напомним принять дозу в указанное вами время. Можно включить и позже.", setupStart: "Начать", setupLocal: "Аккаунта нет. Всё остаётся на этом телефоне.", settings: "Настройки", language: "Язык", replayTour: "Посмотреть обзор снова", theme: "Оформление", bed: "Напоминание о сне", bedDesc: "Напомним готовиться ко сну в выбранное вами время.", thLight: "Светлое", thDark: "Тёмное", thAuto: "Автоматически", profile: "Профиль", namePh: "Имя (показывается в отчёте)",
     overdueAfter: "Отмечать дозу «пропущено?» через:", data: "Данные", exportJson: "Экспорт данных (JSON)",
     deleteAll: "Удалить все данные", confirmAll: "Точно удалить всё? Необратимо", about: "О приложении",
-    aboutText: "Aura · прототип v1.4. Данные хранятся только на этом телефоне. Приложение не медицинский прибор — для обнаружения приступов используйте сертифицированные устройства, а для экстренных случаев заполните Medical ID в телефоне.",
+    aboutText: "Aura · прототип v1.4. Данные хранятся только на этом телефоне. Приложение не медицинский прибор. Для обнаружения приступов используйте сертифицированные устройства, а для экстренных случаев заполните Medical ID в телефоне.",
     aura: "Аура", edit: "Изменить", editSeiz: "Изменить приступ", editEvent: "Изменить запись",
     unanswered: "нет ответа", rAnswered: (a, b) => `отвечено ${a} из ${b}`,
     sum30: "За 30 дней", sumSeiz: "приступы", sumAdh: "лекарства", sumSleep: "сон",
-    sumDemo: "Пример — здесь появятся ваши данные",
+    sumDemo: "Пример: здесь появятся ваши данные",
     sumWhy: "Блокнот накапливает записи. Aura считает из них то, что нужно врачу: процент соблюдения приёма, триггеры по частоте и сон перед приступами.",
     sumOpen: "Открыть отчёт",
     stTaken: "Принято", stLate: "Опаздывает", stSoon: "Ожидает",
-    fbLabel: "Отзыв", fbBtn: "Написать разработчику", fbSubj: "Aura — отзыв",
-    fbNote: "Откроется почтовое приложение. Прилагается только версия и тип устройства — записи дневника не отправляются.",
+    fbLabel: "Отзыв", fbBtn: "Написать разработчику", fbSubj: "Aura: отзыв",
+    fbNote: "Откроется почтовое приложение. Прилагается только версия и тип устройства, записи дневника не отправляются.",
     pause: "Пауза", resume: "Продолжить", paused: "Приостановлено", quickLog: "Записать приступ",
     editMed: "Изменить лекарство", rAdhDays: (a, b) => `за ${a} из ${b} д.`,
     auraKinds: "Как проявилась аура?", auraNew: "Добавить своё описание", rAuraKinds: "Проявление ауры",
-    auraHint: "Своими словами — содержаниеауры показывает неврологу, где начинается приступ.",
+    auraHint: "Своими словами. Содержание ауры показывает неврологу, где начинается приступ.",
     fbBug: "Ошибка", fbIdea: "Предложение", fbOther: "Другое",
-    fbPh: "Что произошло или что хотели бы изменить? Если ошибка — как её повторить?",
+    fbPh: "Что произошло или что хотели бы изменить? Если ошибка, как её повторить?",
     fbAttach: "Будет приложено", fbSend: "Отправить", fbCopy: "Скопировать текст",
     fbSent: "Почтовое приложение открыто", fbFallback: "Если почта не открылась, скопируйте текст и отправьте на", fbNoText: "Опишите, что произошло",
     backup: "Резервная копия", bkMake: "Создать копию", bkRestore: "Восстановить из копии",
-    bkHint: "Файл со всеми данными. Сохраните его — при утере телефона это единственный способ вернуть дневник.",
+    bkHint: "Файл со всеми данными. Сохраните его: при утере телефона это единственный способ вернуть дневник.",
     bkDone: "Копия создана", bkFail: "Не удалось создать копию",
     bkRemind: "Напоминать ежемесячно", bkChecking: "Проверка…",
     bkFound: "Копия найдена", bkFrom: "Создана", bkWill: "Будет восстановлено",
@@ -358,7 +360,7 @@ const STR = {
     bkErrNewer: "Копия создана более новой версией. Обновите Aura.",
     bkErrEmpty: "Копия пуста.",
     seizStart: "Приступ начался", seizEnd: "Приступ закончился", seizRunning: "Идёт приступ",
-    seizAlert: "Затяжной приступ — вызовите скорую",
+    seizAlert: "Затяжной приступ. Вызовите скорую",
     seizAlertNote: "Приложение не звонит само.",
     seizStale: "Приступ уже закончился?",
     seizStaleNote: "Таймер идёт более часа. Если вы забыли его остановить, длительность будет неверной.",
@@ -366,17 +368,18 @@ const STR = {
     measured: "измерено", startedAt: "Начало",
     auraFeel: "Чувствую ауру", auraLogged: "Аура записана", auraLinked: "Связано с аурой {n} мин назад",
     breathe: "Дыхание", breatheNote: "Упражнение на расслабление.", close: "Закрыть", trigOtherPh: "Опишите своими словами",
-    fbCardText: "Aura — мой личный проект, который я делаю в свободное время. Если чего-то не хватает или что-то работает плохо, напишите — это единственный способ мне об этом узнать.",
+    fbCardText: "Aura, это мой личный проект, который я делаю в свободное время. Если чего-то не хватает или что-то работает плохо, напишите: это единственный способ мне об этом узнать.",
     fbCardYes: "Написать", fbCardNo: "Не сейчас",
     tourNext: "Далее", tourDone: "Начать", tourSkip: "Пропустить",
-    tour1: "Таймер измеряет сам — вводить длительность не нужно.",
-    tour2: "Почувствовали ауру? Отметьте здесь.",
-    tour3: "Добавьте лекарства — напомним вовремя.",
-    tour4: "Все приступы в одном месте.",
-    tour5: "Календарь — картина приступов за месяц.",
-    tour6: "Состояние: сон, стресс, усталость.",
-    tour8: "Сводка за 30 дней для врача. Ради неё всё и собирается.",
-    gNotif: "Напоминания приходят с опозданием", gNotifB: "Напоминания передаются системе будильников телефона на 14 дней вперёд, поэтому Aura не обязана работать. Если уведомление появляется только когда вы открываете приложение, его задерживает энергосбережение телефона. Строже всего — Xiaomi, Huawei, Samsung и OnePlus.\n\nСначала проверьте, запланированы ли напоминания вообще: Настройки → Запланировано напоминаний → Проверить. Если показывает 0, телефон их удалил. Если показывает большое число, а уведомление всё равно опаздывает — напоминания созданы правильно, телефон просто не даёт их показать.\n\nВ обоих случаях помогают одни и те же настройки. Названия зависят от телефона, но пути похожи:\n\n1. Энергосбережение → Без ограничений. Настройки → Приложения → Все приложения → Aura → Энергосбережение. Это главное — пока включён любой режим экономии, телефон задерживает напоминания, что бы вы ни меняли в других местах.\n\n2. Автозапуск (Autostart) — включить. В той же карточке Aura. Xiaomi отключает его по умолчанию.\n\n3. Закрепите Aura в списке недавних приложений. Иначе «Очистить всё» удаляет все запланированные напоминания.\n\n4. Будильники и напоминания — разрешить. Настройки → Приложения → Специальный доступ.\n\nПосле изменений оставьте телефон на несколько часов и проверьте, придёт ли напоминание само.",
+    tourNav: "Четыре раздела. Пройдём по всем.",
+    tourTimer: "Таймер измеряет сам, вводить длительность не нужно.",
+    tourAura: "Почувствовали ауру? Отметьте здесь.",
+    tourLog: "Прошедший приступ запишите здесь, таймер не нужен.",
+    tourMeds: "Добавьте лекарства. Напомним вовремя, а дозу отметите прямо в уведомлении.",
+    tourCal: "Картина приступов за месяц. Черта обозначает приступ, а точка вашу запись.",
+    tourState: "Сон, стресс, усталость и заметка. Заметка попадает в отчёт.",
+    tourReport: "Сводка за 30 дней для врача. Ради неё всё и собирается.",
+    gNotif: "Напоминания приходят с опозданием", gNotifB: "Напоминания передаются системе будильников телефона на 14 дней вперёд, поэтому Aura не обязана работать. Если уведомление появляется только когда вы открываете приложение, его задерживает энергосбережение телефона. Строже всего Xiaomi, Huawei, Samsung и OnePlus.\n\nСначала проверьте, запланированы ли напоминания вообще: Настройки → Запланировано напоминаний → Проверить. Если показывает 0, телефон их удалил. Если показывает большое число, а уведомление всё равно опаздывает, значит напоминания созданы правильно, телефон просто не даёт их показать.\n\nВ обоих случаях помогают одни и те же настройки. Названия зависят от телефона, но пути похожи:\n\n1. Энергосбережение → Без ограничений. Настройки → Приложения → Все приложения → Aura → Энергосбережение. Это главное: пока включён любой режим экономии, телефон задерживает напоминания, что бы вы ни меняли в других местах.\n\n2. Автозапуск (Autostart): включить. В той же карточке Aura. Xiaomi отключает его по умолчанию.\n\n3. Закрепите Aura в списке недавних приложений. Иначе «Очистить всё» удаляет все запланированные напоминания.\n\n4. Будильники и напоминания: разрешить. Настройки → Приложения → Специальный доступ.\n\nПосле изменений оставьте телефон на несколько часов и проверьте, придёт ли напоминание само.",
     change: "Изменить упражнение",
     ty: { tonicClonic: "Тонико-клонический", absence: "Абсанс", focal: "Фокальный", myoclonic: "Миоклонический", other: "Другой", unspec: "Не указан" },
     ef: { fall: "Упал(а)", injury: "Травма", tongue: "Прикус языка", incontinence: "Недержание мочи" },
@@ -393,54 +396,54 @@ const STR = {
     newMed: "Nowy lek", medName: "Nazwa, np. Lewetyracetam", medDose: "Dawka, np. 500 mg",
     times: "Pory przyjmowania", addTime: "Dodaj porę", removeTime: "Usuń porę", saveMed: "Zapisz lek",
     todayIs: "Dziś", medsEmptyT: "Na razie pusto",
-    medsEmptyB: "Dodaj lek wraz z porami — dawki oznaczysz jednym dotknięciem.",
-    taken: (a, b) => `Przyjęto ${a} z ${b} dawek dziś`, allDone: " — wszystko ✓",
+    medsEmptyB: "Dodaj lek wraz z porami, a dawki oznaczysz jednym dotknięciem.",
+    taken: (a, b) => `Przyjęto dziś ${a} z ${b} dawek`, allDone: " · wszystko ✓",
     last7: "Ostatnie 7 dni", addMed: "Dodaj lek", missed: "pominięto?", dose: "Dawka",
     regSeiz: "Zapisz napad", per30: "w 30 dni", daysSince: "dni bez napadu", diary: "Dziennik",
-    seizEmpty: "Brak wpisów. Zapisuj każdy napad — dziennik jest dla neurologa cenniejszy niż pamięć.",
+    seizEmpty: "Brak wpisów. Zapisuj każdy napad: dziennik jest dla neurologa cenniejszy niż pamięć.",
     type: "Typ", duration: "Czas trwania", auraYes: "Aura wystąpiła ✓", auraNo: "Bez aury", withAura: "z aurą",
     effects: "Następstwa", triggers: "Możliwe wyzwalacze",
     seizNote: "Notatki (jak się czułeś po, kto widział…)", saveEntry: "Zapisz wpis",
-    statusWarn: "Napad dłuższy niż 5 min może być stanem padaczkowym — konieczna pilna pomoc (112).",
+    statusWarn: "Napad dłuższy niż 5 min może być stanem padaczkowym. Konieczna jest pilna pomoc (112).",
     newEvent: "Nowy wpis w kalendarzu", eventWhat: "Co? np. Odwiedzić rodziców",
-    timeOptional: "Godzina nieobowiązkowa — bez niej wpis będzie „cały dzień”.",
+    timeOptional: "Godzina nieobowiązkowa. Bez niej wpis będzie „cały dzień”.",
     saveEvent: "Dodaj do kalendarza", noEventsDay: "Brak wpisów w tym dniu.", addForDay: "Dodaj na ten dzień", upcoming: "Najbliższe", prepare: "Przygotuj się", inhale: "Wdech", hold: "Wstrzymaj", exhale: "Wydech",
     pBox: "Kwadrat 4·4·4·4", pRelax: "Uspokojenie 4·7·8", start: "Zacznij", stop: "Zatrzymaj",
-    remaining: (n) => `pozostało ${n} min`, doneMin: (n) => `Gotowe — ${n} min ✓`, stoppedMin: (n) => `Zatrzymano — zapisano ${n} min`, sessions: "sesje", minTotal: "min łącznie",
+    remaining: (n) => `pozostało ${n} min`, doneMin: (n) => `Gotowe · ${n} min ✓`, stoppedMin: (n) => `Zatrzymano · zapisano ${n} min`, sessions: "sesje", minTotal: "min łącznie",
     segState: "Stan",
     todayState: "Dzisiejszy stan", sleep: "Sen", stress: "Stres", fatigue: "Zmęczenie", alcohol: "Alkohol",
     yes: "Tak", no: "Nie", optNote: "Notatka (opcjonalnie)", autosave: "Zapisywane automatycznie.",
-    sleep7: "Sen przez 7 dni", sleepHint: "Poniżej 6 h — jeden z najczęstszych wyzwalaczy napadów.",
+    sleep7: "Sen przez 7 dni", sleepHint: "Poniżej 6 h to jeden z najczęstszych wyzwalaczy napadów.",
     rNotes: "Notatki",
     report: "Raport dla lekarza", rSeiz: "Napady", rTypes: "Typy", rAura: "Z aurą",
     rLongest: "Najdłuższy", rAdh: "Przestrzeganie leczenia", rSleep: "Sen", rSleepV: (a, s, n) => `śr. ${a} h · <6 h: ${s}/${n}`,
     rStressFat: "Stres / zmęczenie", rOf5: "(z 5)", rAlco: "Alkohol", rDays: (n) => `${n} dni`, copyText: "Kopiuj jako tekst",
     rNote: "Przestrzeganie liczone jest na podstawie bieżącej listy leków, więc dla okresu przed dodaniem leku jest przybliżone.",
-    rTitle: (n) => `AURA — raport z ${n} dni`, rPatient: "Pacjent", rFooter: "Dane zapisane samodzielnie przez pacjenta w aplikacji Aura.",
+    rTitle: (n) => `AURA · raport z ${n} dni`, rPatient: "Pacjent", rFooter: "Dane zapisane samodzielnie przez pacjenta w aplikacji Aura.",
     rAdhLine: (p, t, s) => `LEKI: przestrzeganie ~${p}% (${t} z ${s} dawek)`,
     setupIntro: "Kilka sekund i możemy zacząć. Wszystko to zmienisz później w ustawieniach.", setupName: "Jak się do Ciebie zwracać?", setupNameHint: "Opcjonalne. Imię pojawia się tylko w raporcie dla lekarza.", setupNotify: "Przypomnienia o lekach", setupNotifyDesc: "Przypomnimy o przyjęciu dawki o podanych porach. Można włączyć też później.", setupStart: "Zacznij", setupLocal: "Nie ma konta. Wszystko zostaje na tym telefonie.", settings: "Ustawienia", language: "Język", replayTour: "Obejrzyj przewodnik ponownie", theme: "Wygląd", bed: "Przypomnienie o śnie", bedDesc: "Przypomnimy o przygotowaniu do snu o wybranej porze.", thLight: "Jasny", thDark: "Ciemny", thAuto: "Automatyczny", profile: "Profil", namePh: "Imię (widoczne w raporcie)",
     overdueAfter: "Oznacz dawkę „pominięto?” po:", data: "Dane", exportJson: "Eksportuj dane (JSON)",
     deleteAll: "Usuń wszystkie dane", confirmAll: "Na pewno usunąć wszystko? Nieodwracalne", about: "O aplikacji",
-    aboutText: "Aura · prototyp v1.4. Dane są przechowywane tylko na tym telefonie. Aplikacja nie jest wyrobem medycznym — do wykrywania napadów używaj certyfikowanych urządzeń, a na wypadek nagły wypełnij Medical ID w telefonie.",
+    aboutText: "Aura · prototyp v1.4. Dane są przechowywane tylko na tym telefonie. Aplikacja nie jest wyrobem medycznym. Do wykrywania napadów używaj certyfikowanych urządzeń, a na wypadek nagły wypełnij Medical ID w telefonie.",
     aura: "Aura", edit: "Edytuj", editSeiz: "Edytuj napad", editEvent: "Edytuj wpis",
     unanswered: "brak odpowiedzi", rAnswered: (a, b) => `odpowiedzi: ${a} z ${b}`,
     sum30: "Ostatnie 30 dni", sumSeiz: "napady", sumAdh: "leki", sumSleep: "sen",
-    sumDemo: "Przykład — tu pojawią się Twoje dane",
+    sumDemo: "Przykład: tu pojawią się Twoje dane",
     sumWhy: "Notatnik gromadzi wpisy. Aura wylicza z nich to, czego potrzebuje lekarz: procent przestrzegania, wyzwalacze według częstości i sen przed napadami.",
     sumOpen: "Otwórz raport",
     stTaken: "Przyjęte", stLate: "Spóźnione", stSoon: "Oczekuje",
-    fbLabel: "Opinia", fbBtn: "Napisz do autora", fbSubj: "Aura — opinia",
-    fbNote: "Otworzy się aplikacja pocztowa. Dołączana jest tylko wersja i typ urządzenia — wpisy z dziennika nie są wysyłane.",
+    fbLabel: "Opinia", fbBtn: "Napisz do autora", fbSubj: "Aura: opinia",
+    fbNote: "Otworzy się aplikacja pocztowa. Dołączana jest tylko wersja i typ urządzenia, wpisy z dziennika nie są wysyłane.",
     pause: "Pauza", resume: "Kontynuuj", paused: "Wstrzymane", quickLog: "Zapisz napad",
     editMed: "Edytuj lek", rAdhDays: (a, b) => `za ${a} z ${b} dni`,
     auraKinds: "Jak objawiła się aura?", auraNew: "Dodaj własny opis", rAuraKinds: "Objawy aury",
-    auraHint: "Własnymi słowami — treść aury mówi neurologowi, gdzie napad się zaczyna.",
+    auraHint: "Własnymi słowami. Treść aury mówi neurologowi, gdzie napad się zaczyna.",
     fbBug: "Błąd", fbIdea: "Pomysł", fbOther: "Inne",
-    fbPh: "Co się stało lub co chciałbyś zmienić? Jeśli to błąd — jak go powtórzyć?",
+    fbPh: "Co się stało albo co chcesz zmienić? Jeśli to błąd, jak go powtórzyć?",
     fbAttach: "Zostanie dołączone", fbSend: "Wyślij", fbCopy: "Kopiuj tekst",
     fbSent: "Otwarto aplikację pocztową", fbFallback: "Jeśli poczta się nie otworzyła, skopiuj tekst i wyślij na", fbNoText: "Opisz, co się stało",
     backup: "Kopia zapasowa", bkMake: "Utwórz kopię", bkRestore: "Przywróć z kopii",
-    bkHint: "Plik ze wszystkimi danymi. Zachowaj go — po utracie telefonu to jedyny sposób odzyskania dziennika.",
+    bkHint: "Plik ze wszystkimi danymi. Zachowaj go: po utracie telefonu to jedyny sposób odzyskania dziennika.",
     bkDone: "Kopia utworzona", bkFail: "Nie udało się utworzyć kopii",
     bkRemind: "Przypominaj co miesiąc", bkChecking: "Sprawdzanie…",
     bkFound: "Znaleziono kopię", bkFrom: "Utworzona", bkWill: "Zostanie przywrócone",
@@ -450,7 +453,7 @@ const STR = {
     bkErrNewer: "Kopia pochodzi z nowszej wersji. Zaktualizuj Aurę.",
     bkErrEmpty: "Kopia jest pusta.",
     seizStart: "Napad się zaczął", seizEnd: "Napad się skończył", seizRunning: "Trwa napad",
-    seizAlert: "Przedłużający się napad — wezwij pogotowie",
+    seizAlert: "Przedłużający się napad. Wezwij pogotowie",
     seizAlertNote: "Aplikacja nie dzwoni samodzielnie.",
     seizStale: "Czy napad już się skończył?",
     seizStaleNote: "Stoper działa ponad godzinę. Jeśli zapomniałeś go zatrzymać, czas będzie błędny.",
@@ -458,17 +461,18 @@ const STR = {
     measured: "zmierzone", startedAt: "Początek",
     auraFeel: "Czuję aurę", auraLogged: "Aura zapisana", auraLinked: "Powiązane z aurą sprzed {n} min",
     breathe: "Oddech", breatheNote: "Ćwiczenie relaksacyjne.", close: "Zamknij", trigOtherPh: "Opisz własnymi słowami",
-    fbCardText: "Aura to mój osobisty projekt, tworzony po godzinach. Jeśli czegoś brakuje albo coś działa źle, napisz — to jedyny sposób, żebym się o tym dowiedział.",
+    fbCardText: "Aura to mój osobisty projekt, tworzony po godzinach. Jeśli czegoś brakuje albo coś działa źle, napisz: to jedyny sposób, żebym się o tym dowiedział.",
     fbCardYes: "Napisz", fbCardNo: "Nie teraz",
     tourNext: "Dalej", tourDone: "Zacznij", tourSkip: "Pomiń",
-    tour1: "Stoper mierzy sam — nie trzeba wpisywać czasu.",
-    tour2: "Czujesz aurę? Zaznacz tutaj.",
-    tour3: "Dodaj leki — przypomnimy na czas.",
-    tour4: "Wszystkie napady w jednym miejscu.",
-    tour5: "Kalendarz — obraz napadów w skali miesiąca.",
-    tour6: "Samopoczucie: sen, stres, zmęczenie.",
-    tour8: "Podsumowanie 30 dni dla lekarza. Po to wszystko jest zbierane.",
-    gNotif: "Przypomnienia przychodzą z opóźnieniem", gNotifB: "Przypomnienia są przekazywane systemowi alarmów telefonu na 14 dni do przodu, więc Aura nie musi działać. Jeśli powiadomienie pojawia się dopiero po otwarciu aplikacji, wstrzymuje je oszczędzanie energii. Najsurowsze są Xiaomi, Huawei, Samsung i OnePlus.\n\nNajpierw sprawdź, czy przypomnienia w ogóle zostały zaplanowane: Ustawienia → Zaplanowane przypomnienia → Sprawdź. Jeśli pokazuje 0, telefon je usunął. Jeśli pokazuje dużą liczbę, a powiadomienie i tak się spóźnia — przypomnienia są poprawne, telefon po prostu nie pozwala ich pokazać.\n\nW obu przypadkach pomagają te same ustawienia. Nazwy zależą od telefonu, ale ścieżki są podobne:\n\n1. Oszczędzanie baterii → Bez ograniczeń. Ustawienia → Aplikacje → Zarządzaj aplikacjami → Aura → Oszczędzanie baterii. To najważniejszy krok — dopóki działa jakikolwiek tryb oszczędzania, telefon wstrzymuje przypomnienia, cokolwiek zmienisz gdzie indziej.\n\n2. Autostart — włącz. W tym samym wpisie Aura. Xiaomi wyłącza go domyślnie.\n\n3. Zablokuj Aurę na ekranie ostatnich aplikacji. Inaczej „Wyczyść wszystko” kasuje wszystkie zaplanowane przypomnienia.\n\n4. Alarmy i przypomnienia — zezwól. Ustawienia → Aplikacje → Specjalny dostęp.\n\nPo zmianach zostaw telefon na kilka godzin i sprawdź, czy przypomnienie przyjdzie samo.",
+    tourNav: "Cztery zakładki. Przejdziemy przez wszystkie.",
+    tourTimer: "Stoper mierzy sam, nie trzeba wpisywać czasu.",
+    tourAura: "Czujesz aurę? Zaznacz tutaj.",
+    tourLog: "Miniony napad zapisz tutaj, stoper nie jest potrzebny.",
+    tourMeds: "Dodaj leki. Przypomnimy na czas, a dawkę oznaczysz wprost w powiadomieniu.",
+    tourCal: "Obraz napadów w skali miesiąca. Kreski oznaczają napady, a kropki twoje wpisy.",
+    tourState: "Sen, stres, zmęczenie i notatka. Notatka trafia do raportu.",
+    tourReport: "Podsumowanie 30 dni dla lekarza. Po to wszystko jest zbierane.",
+    gNotif: "Przypomnienia przychodzą z opóźnieniem", gNotifB: "Przypomnienia są przekazywane systemowi alarmów telefonu na 14 dni do przodu, więc Aura nie musi działać. Jeśli powiadomienie pojawia się dopiero po otwarciu aplikacji, wstrzymuje je oszczędzanie energii. Najsurowsze są Xiaomi, Huawei, Samsung i OnePlus.\n\nNajpierw sprawdź, czy przypomnienia w ogóle zostały zaplanowane: Ustawienia → Zaplanowane przypomnienia → Sprawdź. Jeśli pokazuje 0, telefon je usunął. Jeśli pokazuje dużą liczbę, a powiadomienie i tak się spóźnia, to przypomnienia są poprawne, telefon po prostu nie pozwala ich pokazać.\n\nW obu przypadkach pomagają te same ustawienia. Nazwy zależą od telefonu, ale ścieżki są podobne:\n\n1. Oszczędzanie baterii → Bez ograniczeń. Ustawienia → Aplikacje → Zarządzaj aplikacjami → Aura → Oszczędzanie baterii. To najważniejszy krok: dopóki działa jakikolwiek tryb oszczędzania, telefon wstrzymuje przypomnienia, cokolwiek zmienisz gdzie indziej.\n\n2. Autostart: włącz. W tym samym wpisie Aura. Xiaomi wyłącza go domyślnie.\n\n3. Zablokuj Aurę na ekranie ostatnich aplikacji. Inaczej „Wyczyść wszystko” kasuje wszystkie zaplanowane przypomnienia.\n\n4. Alarmy i przypomnienia: zezwól. Ustawienia → Aplikacje → Specjalny dostęp.\n\nPo zmianach zostaw telefon na kilka godzin i sprawdź, czy przypomnienie przyjdzie samo.",
     change: "Zmień ćwiczenie",
     ty: { tonicClonic: "Toniczno-kloniczny", absence: "Napad nieświadomości", focal: "Ogniskowy", myoclonic: "Miokloniczny", other: "Inny", unspec: "Nieokreślony" },
     ef: { fall: "Upadek", injury: "Uraz", tongue: "Przygryzienie języka", incontinence: "Nietrzymanie moczu" },
@@ -483,7 +487,7 @@ const localeOf = (lang) => (LANGS.find((l) => l.id === lang) || LANGS[0]).locale
 const NOTIF = {
   lt: {
     title: "Laikas išgerti vaistus", body: (m) => `${m.name}${m.dose ? " · " + m.dose : ""}`,
-    fuTitle: "Dozė nepažymėta", fuBody: (m) => `${m.name} — ar tikrai išgėrei?`,
+    fuTitle: "Dozė nepažymėta", fuBody: (m) => `${m.name}: ar tikrai išgėrei?`,
     // mygtukas pačiame pranešime; belytė forma, kad tiktų visiems
     actTaken: "Išgėriau",
     channel: "Vaistų priminimai", label: "Priminimai",
@@ -497,7 +501,7 @@ const NOTIF = {
   },
   en: {
     title: "Time to take your medication", body: (m) => `${m.name}${m.dose ? " · " + m.dose : ""}`,
-    fuTitle: "Dose not marked", fuBody: (m) => `${m.name} — did you actually take it?`,
+    fuTitle: "Dose not marked", fuBody: (m) => `${m.name}: did you actually take it?`,
     actTaken: "Taken",
     channel: "Medication reminders", label: "Reminders",
     bkTitle: "Time to back up", bkBody: "Your diary is stored only on this phone.", bkChannel: "Backup reminders",
@@ -510,7 +514,7 @@ const NOTIF = {
   },
   ru: {
     title: "Время принять лекарство", body: (m) => `${m.name}${m.dose ? " · " + m.dose : ""}`,
-    fuTitle: "Доза не отмечена", fuBody: (m) => `${m.name} — вы действительно приняли?`,
+    fuTitle: "Доза не отмечена", fuBody: (m) => `${m.name}: вы действительно приняли?`,
     actTaken: "Выпито",
     channel: "Напоминания о лекарствах", label: "Напоминания",
     bkTitle: "Сделайте резервную копию", bkBody: "Дневник хранится только на этом телефоне.", bkChannel: "Напоминания о копиях",
@@ -523,7 +527,7 @@ const NOTIF = {
   },
   pl: {
     title: "Czas wziąć lek", body: (m) => `${m.name}${m.dose ? " · " + m.dose : ""}`,
-    fuTitle: "Dawka nieoznaczona", fuBody: (m) => `${m.name} — czy naprawdę wziąłeś?`,
+    fuTitle: "Dawka nieoznaczona", fuBody: (m) => `${m.name}: czy dawka została przyjęta?`,
     actTaken: "Zażyte",
     channel: "Przypomnienia o lekach", label: "Przypomnienia",
     bkTitle: "Zrób kopię zapasową", bkBody: "Dziennik jest przechowywany tylko na tym telefonie.", bkChannel: "Przypomnienia o kopiach",
@@ -650,8 +654,9 @@ function SectionLabel({ children, style }) {
   return <div style={{ fontFamily: T.serif, fontSize: 18, fontWeight: 600, color: C.ink, margin: "24px 4px 10px", ...style }}>{children}</div>;
 }
 
-function Card({ children, style }) {
-  return <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, boxShadow: `0 1px 2px ${C.sh1}`, ...style }}>{children}</div>;
+// `tour` – kad apžvalga galėtų apvesti ne tik mygtukus, bet ir ištisas korteles
+function Card({ children, style, tour }) {
+  return <div data-tour={tour} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, boxShadow: `0 1px 2px ${C.sh1}`, ...style }}>{children}</div>;
 }
 
 function Chip({ active, onClick, children, color = C.clay, soft = C.claySoft }) {
@@ -1121,7 +1126,7 @@ function SeizuresView({ data, update, t, lc, onReport, quickLog, measured, onMea
             border: `1px solid ${C.plum}`, background: C.card, color: C.plum, fontSize: 14.5, fontWeight: 600,
           }}>{t.auraFeel}</button>
           {auraMsg && <div style={{ fontSize: 13, color: C.plum, fontWeight: 600, marginTop: 8, textAlign: "center" }}>{t.auraLogged}</div>}
-          <button className="press" onClick={() => setEditing(null)}
+          <button className="press" onClick={() => setEditing(null)} data-tour="regSeiz"
             style={{ width: "100%", padding: 10, marginTop: 8, fontSize: 14, fontWeight: 600, color: C.sub }}>
             {t.regSeiz}
           </button>
@@ -1295,7 +1300,7 @@ function CalendarView({ data, update, t, lc }) {
 
   return (
     <div>
-      <Card style={{ marginTop: 16, padding: 14 }}>
+      <Card tour="calGrid" style={{ marginTop: 16, padding: 14 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <button className="press" onClick={() => setCur(new Date(y, m - 1, 1))} aria-label={t.prev} style={iconBtn}><ChevronLeft size={20} /></button>
           <div style={{ fontFamily: T.serif, fontSize: 18, fontWeight: 600, textTransform: "capitalize" }}>{fMonth(cur, lc)}</div>
@@ -1564,7 +1569,7 @@ function StateView({ data, update, t, lc }) {
         <button className="press" onClick={() => setOffset(Math.max(0, offset - 1))} disabled={offset === 0} aria-label={t.next}
           style={{ ...iconBtn, color: offset === 0 ? C.line : C.sub }}><ChevronRight size={20} /></button>
       </div>
-      <Card style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <Card tour="stateCard" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontSize: 15, fontWeight: 500 }}>{t.sleep}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -1685,7 +1690,7 @@ function buildReport(data, days, t) {
   L.push("");
   if (adh != null) {
     L.push(t.rAdhLine(adh, taken, scheduled) + ` (${t.rAdhDays(adhDays, days)})`);
-    data.meds.forEach((m) => L.push(`  ${m.name}${m.dose ? " " + m.dose : ""} — ${m.times.join(", ")}`));
+    data.meds.forEach((m) => L.push(`  ${m.name}${m.dose ? " " + m.dose : ""} · ${m.times.join(", ")}`));
     L.push("");
   }
   if (sleepAvg != null) L.push(`${t.rSleep.toUpperCase()}: ${t.rSleepV(sleepAvg, shortN, sleeps.length)}`);
@@ -1905,17 +1910,23 @@ function SetupSheet({ t, lang, name, notify, perm, onLang, onName, onNotify, onD
  * tad techniškai perjungti nebūtina — bet be to žmogus matytų tik apvestą ikoną
  * ir nė karto to ekrano, apie kurį kalbama.
  */
-// Tvarka seka skirtukus, o ne funkcijas: laikmatis ir aura persikėlė į
-// Priepuolius, todėl abu žingsniai eina po to skirtuko pristatymo. Užrašų
-// žingsnio nebėra kartu su skirtuku.
+/**
+ * Apžvalga eina per VISUS skirtukus ir kiekviename apveda tikrą turinį, o ne
+ * apatinės juostos piktogramą. Anksčiau Kalendorius ir Būsena tebuvo apvesta
+ * navigacijoje — vartotojas pamatydavo, kur paspausti, bet ne ką ten ras.
+ *
+ * Tvarka seka skirtukų tvarką ekrane, pradedant nuo pradinio (Priepuoliai).
+ * Raktai vardiniai, ne numeruoti: perstačius žingsnį numeriai imdavo meluoti.
+ */
 const TOUR_STEPS = (t) => [
-  { el: "addMed", text: t.tour3, tab: "meds" },
-  { el: "tab-seizures", text: t.tour4, tab: "seizures" },
-  { el: "seiz", text: t.tour1, tab: "seizures" },
-  { el: "aura", text: t.tour2, tab: "seizures" },
-  { el: "tab-calendar", text: t.tour5, tab: "calendar" },
-  { el: "tab-state", text: t.tour6, tab: "state" },
-  { el: "report", text: t.tour8, tab: "meds" },
+  { el: "nav", text: t.tourNav, tab: "seizures" },
+  { el: "seiz", text: t.tourTimer, tab: "seizures" },
+  { el: "aura", text: t.tourAura, tab: "seizures" },
+  { el: "regSeiz", text: t.tourLog, tab: "seizures" },
+  { el: "addMed", text: t.tourMeds, tab: "meds" },
+  { el: "calGrid", text: t.tourCal, tab: "calendar" },
+  { el: "stateCard", text: t.tourState, tab: "state" },
+  { el: "report", text: t.tourReport, tab: "meds" },
 ];
 
 /**
@@ -2111,7 +2122,7 @@ function FeedbackSheet({ data, t, onClose }) {
   const kinds = [{ v: "bug", label: t.fbBug }, { v: "idea", label: t.fbIdea }, { v: "other", label: t.fbOther }];
   const env = [`Aura ${APP_VERSION}`, isNative() ? "app" : "web", navigator.platform || "?",
                `lang=${data.settings?.lang || "lt"}`].join(" · ");
-  const subject = `${t.fbSubj} — ${kinds.find((k) => k.v === kind).label}`;
+  const subject = `${t.fbSubj}: ${kinds.find((k) => k.v === kind).label}`;
   const full = `${text.trim()}\n\n---\n${env}`;
 
   return (
@@ -2280,9 +2291,12 @@ function BreatheSheet({ data, update, t, onClose }) {
 }
 
 // ---------- app shell ----------
+// Priepuoliai pirmi: vaistų dozę pažymėti galima ir iš pranešimo, o priepuolį
+// registruoti reikia čia ir dažnai skubiai.
+const HOME_TAB = "seizures";
 const TABS = [
-  { id: "meds", key: "tMeds", icon: Pill },
   { id: "seizures", key: "tSeiz", icon: Zap },
+  { id: "meds", key: "tMeds", icon: Pill },
   { id: "calendar", key: "tCal", icon: CalendarDays },
   { id: "state", key: "segState", icon: Activity },
 ];
@@ -2291,7 +2305,7 @@ export default function App() {
   const [data, setData] = useState(DEFAULT_DATA);
   const [loaded, setLoaded] = useState(false);
   const [storageOk, setStorageOk] = useState(true);
-  const [tab, setTab] = useState("meds");
+  const [tab, setTab] = useState(HOME_TAB);
   const [showReport, setShowReport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -2380,7 +2394,7 @@ export default function App() {
     if (tourStep >= 0) endTour();
     else if (showSettings) setShowSettings(false);
     else if (showReport) setShowReport(false);
-    else if (tab !== "meds") setTab("meds");
+    else if (tab !== HOME_TAB) setTab(HOME_TAB);
     else exitApp();
   }), [tourStep, showSettings, showReport, tab]);
 
@@ -2460,14 +2474,14 @@ export default function App() {
     }
     // tuščiam dienynui pirma nustatymas; apžvalgą paleis jis pats, kai baigsis
     if (data.settings?.setup !== "done") { setShowSetup(true); return; }
-    setTab("meds");
+    setTab(HOME_TAB);
     setTourStep(0);
   }, [loaded]);
 
   const finishSetup = () => {
     setShowSetup(false);
     update((d) => { d.settings = { ...d.settings, setup: "done" }; return d; });
-    setTab("meds");
+    setTab(HOME_TAB);
     setTourStep(0);
   };
 
@@ -2483,7 +2497,7 @@ export default function App() {
 
   const endTour = () => {
     setTourStep(-1);
-    setTab("meds");   // apžvalga baigiasi ties „Užrašais“ – grąžinam į pradžią
+    setTab(HOME_TAB);   // apžvalga baigiasi ties ataskaita – grąžinam į pradžią
     update((d) => { d.settings = { ...d.settings, tour: "done" }; return d; });
   };
 
@@ -2605,7 +2619,7 @@ export default function App() {
         onFeedback={() => { setShowSettings(false); setShowFeedback(true); }}
         onBackup={() => { setShowSettings(false); setShowBackup(true); }}
         onNotifHelp={() => { setShowSettings(false); setShowNotifHelp(true); }}
-        onReplayTour={() => { setShowSettings(false); setTab("meds"); setTourStep(0); }}
+        onReplayTour={() => { setShowSettings(false); setTab(HOME_TAB); setTourStep(0); }}
         onClose={() => setShowSettings(false)} />}
       {showNotifHelp && <NotifHelpSheet t={t} onClose={() => setShowNotifHelp(false)} />}
       {tourStep >= 0 && tourSteps[tourStep] && (
