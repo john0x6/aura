@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, Children } from "react";
 import { load as loadData, save as saveData, clear as clearData } from "./storage";
 import { syncMedReminders, initChannel, permissionState, requestPermission, isNative,
          cancelDose, restoreDose, pendingCount, FOLLOWUP_MIN } from "./notifications";
@@ -140,7 +140,8 @@ const STR = {
     rNote: "Vaistų laikymasis skaičiuojamas pagal dabartinį vaistų sąrašą, todėl laikotarpiui iki vaisto pridėjimo jis apytikslis.",
     rTitle: (n) => `AURA · ${n} d. ataskaita`, rPatient: "Pacientas", rFooter: "Duomenys registruoti paties paciento programėle Aura.",
     rAdhLine: (p, t, s) => `VAISTAI: laikymasis ~${p}% (${t} iš ${s} dozių)`,
-    setupIntro: "Kelios sekundės, ir galim pradėti. Visa tai vėliau pakeisi Nustatymuose.", setupName: "Kaip į tave kreiptis?", setupNameHint: "Neprivaloma. Vardas rodomas tik ataskaitoje gydytojui.", setupNotify: "Vaistų priminimai", setupNotifyDesc: "Priminsim išgerti dozę tavo nurodytu laiku. Galima įjungti ir vėliau.", setupStart: "Pradėti", setupLocal: "Paskyros nėra. Viskas lieka šiame telefone.", settings: "Nustatymai", language: "Kalba", replayTour: "Peržiūrėti apžvalgą", theme: "Išvaizda", bed: "Miego priminimas", bedDesc: "Priminsim ruoštis miegoti tavo pasirinktu laiku.", thLight: "Šviesi", thDark: "Tamsi", thAuto: "Automatinė", profile: "Profilis", namePh: "Vardas (rodomas ataskaitoje)",
+    setupIntro: "Kelios sekundės, ir galim pradėti. Visa tai vėliau pakeisi Nustatymuose.", setupName: "Kaip į tave kreiptis?", setupNameHint: "Neprivaloma. Vardas rodomas tik ataskaitoje gydytojui.", setupNotify: "Vaistų priminimai", setupNotifyDesc: "Priminsim išgerti dozę tavo nurodytu laiku. Galima įjungti ir vėliau.", setupStart: "Pradėti", setupLocal: "Paskyros nėra. Viskas lieka šiame telefone.", settings: "Nustatymai", language: "Kalba", replayTour: "Peržiūrėti apžvalgą", theme: "Išvaizda", bed: "Miego priminimas", bedDesc: "Priminsim ruoštis miegoti tavo pasirinktu laiku.",
+    sleepWin: "Miego langas", sleepWinDesc: "Iš jo pasiūlysim miego valandas dienos būsenoje.", bedFrom: "nuo", bedTo: "iki", thLight: "Šviesi", thDark: "Tamsi", thAuto: "Automatinė", profile: "Profilis", namePh: "Vardas (rodomas ataskaitoje)",
     overdueAfter: "Dozė žymima „praleista?“ po:", data: "Duomenys", exportJson: "Eksportuoti duomenis (JSON)",
     deleteAll: "Ištrinti visus duomenis", confirmAll: "Tikrai ištrinti viską? Negrįžtama", about: "Apie",
     aboutText: "Aura · prototipas v1.4. Duomenys saugomi tik šiame telefone. Programėlė nėra medicinos prietaisas. Priepuolių detekcijai naudok sertifikuotus įrenginius, o skubiai informacijai užsipildyk telefono Medical ID.",
@@ -235,7 +236,8 @@ const STR = {
     rNote: "Adherence is calculated from your current medication list, so it is approximate for periods before a medication was added.",
     rTitle: (n) => `AURA · ${n}-day report`, rPatient: "Patient", rFooter: "Data self-recorded by the patient using the Aura app.",
     rAdhLine: (p, t, s) => `MEDICATION: adherence ~${p}% (${t} of ${s} doses)`,
-    setupIntro: "A few seconds and we can begin. All of this can be changed later in Settings.", setupName: "What should we call you?", setupNameHint: "Optional. The name appears only in the doctor’s report.", setupNotify: "Medication reminders", setupNotifyDesc: "We will remind you to take a dose at the times you enter. You can turn this on later too.", setupStart: "Get started", setupLocal: "There is no account. Everything stays on this phone.", settings: "Settings", language: "Language", replayTour: "Replay the tour", theme: "Appearance", bed: "Bedtime reminder", bedDesc: "A nudge to start winding down at the time you choose.", thLight: "Light", thDark: "Dark", thAuto: "Automatic", profile: "Profile", namePh: "Name (shown in the report)",
+    setupIntro: "A few seconds and we can begin. All of this can be changed later in Settings.", setupName: "What should we call you?", setupNameHint: "Optional. The name appears only in the doctor’s report.", setupNotify: "Medication reminders", setupNotifyDesc: "We will remind you to take a dose at the times you enter. You can turn this on later too.", setupStart: "Get started", setupLocal: "There is no account. Everything stays on this phone.", settings: "Settings", language: "Language", replayTour: "Replay the tour", theme: "Appearance", bed: "Bedtime reminder", bedDesc: "A nudge to start winding down at the time you choose.",
+    sleepWin: "Sleep window", sleepWinDesc: "We will suggest sleep hours in the daily state.", bedFrom: "from", bedTo: "to", thLight: "Light", thDark: "Dark", thAuto: "Automatic", profile: "Profile", namePh: "Name (shown in the report)",
     overdueAfter: "Mark a dose as “missed?” after:", data: "Data", exportJson: "Export data (JSON)",
     deleteAll: "Delete all data", confirmAll: "Delete everything? This cannot be undone", about: "About",
     aboutText: "Aura · prototype v1.4. Data is stored only on this phone. This app is not a medical device. Use certified devices for seizure detection, and fill in your phone's Medical ID for emergencies.",
@@ -328,7 +330,8 @@ const STR = {
     rNote: "Соблюдение приёма считается по текущему списку лекарств, поэтому для периода до добавления лекарства оно приблизительно.",
     rTitle: (n) => `AURA · отчёт за ${n} д.`, rPatient: "Пациент", rFooter: "Данные записаны самим пациентом в приложении Aura.",
     rAdhLine: (p, t, s) => `ЛЕКАРСТВА: соблюдение ~${p}% (${t} из ${s} доз)`,
-    setupIntro: "Несколько секунд, и можно начинать. Всё это позже можно изменить в настройках.", setupName: "Как к вам обращаться?", setupNameHint: "Необязательно. Имя показывается только в отчёте врачу.", setupNotify: "Напоминания о лекарствах", setupNotifyDesc: "Напомним принять дозу в указанное вами время. Можно включить и позже.", setupStart: "Начать", setupLocal: "Аккаунта нет. Всё остаётся на этом телефоне.", settings: "Настройки", language: "Язык", replayTour: "Посмотреть обзор снова", theme: "Оформление", bed: "Напоминание о сне", bedDesc: "Напомним готовиться ко сну в выбранное вами время.", thLight: "Светлое", thDark: "Тёмное", thAuto: "Автоматически", profile: "Профиль", namePh: "Имя (показывается в отчёте)",
+    setupIntro: "Несколько секунд, и можно начинать. Всё это позже можно изменить в настройках.", setupName: "Как к вам обращаться?", setupNameHint: "Необязательно. Имя показывается только в отчёте врачу.", setupNotify: "Напоминания о лекарствах", setupNotifyDesc: "Напомним принять дозу в указанное вами время. Можно включить и позже.", setupStart: "Начать", setupLocal: "Аккаунта нет. Всё остаётся на этом телефоне.", settings: "Настройки", language: "Язык", replayTour: "Посмотреть обзор снова", theme: "Оформление", bed: "Напоминание о сне", bedDesc: "Напомним готовиться ко сну в выбранное вами время.",
+    sleepWin: "Окно сна", sleepWinDesc: "По нему предложим часы сна в состоянии дня.", bedFrom: "с", bedTo: "до", thLight: "Светлое", thDark: "Тёмное", thAuto: "Автоматически", profile: "Профиль", namePh: "Имя (показывается в отчёте)",
     overdueAfter: "Отмечать дозу «пропущено?» через:", data: "Данные", exportJson: "Экспорт данных (JSON)",
     deleteAll: "Удалить все данные", confirmAll: "Точно удалить всё? Необратимо", about: "О приложении",
     aboutText: "Aura · прототип v1.4. Данные хранятся только на этом телефоне. Приложение не медицинский прибор. Для обнаружения приступов используйте сертифицированные устройства, а для экстренных случаев заполните Medical ID в телефоне.",
@@ -421,7 +424,8 @@ const STR = {
     rNote: "Przestrzeganie liczone jest na podstawie bieżącej listy leków, więc dla okresu przed dodaniem leku jest przybliżone.",
     rTitle: (n) => `AURA · raport z ${n} dni`, rPatient: "Pacjent", rFooter: "Dane zapisane samodzielnie przez pacjenta w aplikacji Aura.",
     rAdhLine: (p, t, s) => `LEKI: przestrzeganie ~${p}% (${t} z ${s} dawek)`,
-    setupIntro: "Kilka sekund i możemy zacząć. Wszystko to zmienisz później w ustawieniach.", setupName: "Jak się do Ciebie zwracać?", setupNameHint: "Opcjonalne. Imię pojawia się tylko w raporcie dla lekarza.", setupNotify: "Przypomnienia o lekach", setupNotifyDesc: "Przypomnimy o przyjęciu dawki o podanych porach. Można włączyć też później.", setupStart: "Zacznij", setupLocal: "Nie ma konta. Wszystko zostaje na tym telefonie.", settings: "Ustawienia", language: "Język", replayTour: "Obejrzyj przewodnik ponownie", theme: "Wygląd", bed: "Przypomnienie o śnie", bedDesc: "Przypomnimy o przygotowaniu do snu o wybranej porze.", thLight: "Jasny", thDark: "Ciemny", thAuto: "Automatyczny", profile: "Profil", namePh: "Imię (widoczne w raporcie)",
+    setupIntro: "Kilka sekund i możemy zacząć. Wszystko to zmienisz później w ustawieniach.", setupName: "Jak się do Ciebie zwracać?", setupNameHint: "Opcjonalne. Imię pojawia się tylko w raporcie dla lekarza.", setupNotify: "Przypomnienia o lekach", setupNotifyDesc: "Przypomnimy o przyjęciu dawki o podanych porach. Można włączyć też później.", setupStart: "Zacznij", setupLocal: "Nie ma konta. Wszystko zostaje na tym telefonie.", settings: "Ustawienia", language: "Język", replayTour: "Obejrzyj przewodnik ponownie", theme: "Wygląd", bed: "Przypomnienie o śnie", bedDesc: "Przypomnimy o przygotowaniu do snu o wybranej porze.",
+    sleepWin: "Okno snu", sleepWinDesc: "Na tej podstawie zaproponujemy godziny snu w stanie dnia.", bedFrom: "od", bedTo: "do", thLight: "Jasny", thDark: "Ciemny", thAuto: "Automatyczny", profile: "Profil", namePh: "Imię (widoczne w raporcie)",
     overdueAfter: "Oznacz dawkę „pominięto?” po:", data: "Dane", exportJson: "Eksportuj dane (JSON)",
     deleteAll: "Usuń wszystkie dane", confirmAll: "Na pewno usunąć wszystko? Nieodwracalne", about: "O aplikacji",
     aboutText: "Aura · prototyp v1.4. Dane są przechowywane tylko na tym telefonie. Aplikacja nie jest wyrobem medycznym. Do wykrywania napadów używaj certyfikowanych urządzeń, a na wypadek nagły wypełnij Medical ID w telefonie.",
@@ -1548,6 +1552,27 @@ function DotScale({ value, onChange, label }) {
   );
 }
 
+/**
+ * Miego lango ilgis valandomis. Langas beveik visada kerta vidurnaktį (21:00–07:00),
+ * tad neigiamas skirtumas reiškia kitą parą, o ne klaidą.
+ *
+ * Apvalinama iki 0,5 h, nes tokiu žingsniu dirba ir rankinis mygtukas: pasiūlymas,
+ * kurio ranka nepakartotum, atrodytų kaip kito matavimo duomuo.
+ * Virš 14 h grąžinama null: tai stepper'io riba ir ženklas, kad langas suvestas atvirkščiai.
+ */
+function windowHours(from, to) {
+  const mins = (s) => {
+    const [h, m] = String(s || "").split(":").map(Number);
+    return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null;
+  };
+  const a = mins(from), b = mins(to);
+  if (a == null || b == null) return null;
+  let d = b - a;
+  if (d <= 0) d += 1440;
+  const h = Math.round(d / 30) / 2;
+  return h > 0 && h <= 14 ? h : null;
+}
+
 function StateView({ data, update, t, lc }) {
   // ne tik šiandien: vakar pamiršta miego valanda iki šiol buvo neįrašoma niekada
   const [offset, setOffset] = useState(0);
@@ -1557,6 +1582,11 @@ function StateView({ data, update, t, lc }) {
   const setField = (k, v) => update((d) => { d.daily[tk] = { ...DAILY_EMPTY, ...(d.daily[tk] || {}), [k]: v }; return d; });
   const days = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i - 6));
   const WD = wdShort(lc);
+  // pasiūlymas tik tada, kai langas tikrai nustatytas: skaičius iš numatytosios
+  // reikšmės, kurios žmogus niekada nematė, atrodytų kaip išmatuotas duomuo
+  const bedtime = data.settings?.bedtime || "22:30";
+  const waketime = data.settings?.waketime || null;
+  const winH = waketime ? windowHours(bedtime, waketime) : null;
   const stepBtn = { width: 44, height: 44, borderRadius: 10, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", background: C.white };
 
   return (
@@ -1580,6 +1610,19 @@ function StateView({ data, update, t, lc }) {
             <button className="press" onClick={() => setField("sleep", Math.min(14, (today.sleep ?? 6.5) + 0.5))} aria-label={t.more} style={stepBtn}><Plus size={16} /></button>
           </div>
         </div>
+
+        {/* Pasiūlymas, o ne automatinis įrašas: neatsakyta miego valanda turi likti
+            neatsakyta, kol žmogus nepatvirtina. Kitaip ataskaitoje gydytojui atsirastų
+            skaičius, kurio niekas nematavo. Dingsta iškart po paspaudimo. */}
+        {today.sleep === null && winH != null && (
+          <button className="press" onClick={() => setField("sleep", winH)} style={{
+            marginTop: -8, alignSelf: "flex-start", minHeight: 44, padding: "10px 14px",
+            borderRadius: 999, border: `1px dashed ${C.line}`, background: C.white,
+            fontFamily: T.body, fontSize: 13, color: C.sub, textAlign: "left",
+          }}>
+            {t.sleepWin} {t.bedFrom} {bedtime} {t.bedTo} {waketime} · <b style={{ color: C.ink }}>{winH} h</b>
+          </button>
+        )}
 
         <DotScale label={t.stress} value={today.stress} onChange={(n) => setField("stress", n)} />
         <DotScale label={t.fatigue} value={today.fatigue} onChange={(n) => setField("fatigue", n)} />
@@ -2164,9 +2207,73 @@ function FeedbackSheet({ data, t, onClose }) {
 }
 
 // ---------- settings ----------
+
+/**
+ * Nustatymų kortelė. Iki tol nustatymai buvo vienintelis ekranas, kur valdikliai
+ * kabo tiesiai ant fono, nors visur kitur Auroje turinys sėdi ant kortelės.
+ *
+ * Skirtukas tarp eilučių piešiamas čia, o ne pačioje eilutėje: dalis eilučių yra
+ * sąlyginės (miego laikas, diagnostika, įspėjimai), tad eilutėje piešiamas brūkšnys
+ * kartais pakibtų kortelės viršuje.
+ */
+function SetGroup({ label, children, style }) {
+  const rows = Children.toArray(children);
+  return (
+    <>
+      {label ? <SectionLabel>{label}</SectionLabel> : null}
+      <Card style={{ padding: 0, overflow: "hidden", ...style }}>
+        {rows.map((r, i) => (
+          <div key={i} style={i ? { borderTop: `1px solid ${C.line}` } : undefined}>{r}</div>
+        ))}
+      </Card>
+    </>
+  );
+}
+
+/** Užrašas kairėje, valdiklis dešinėje. `stack` – kai valdiklis platus (chip'ų eilė, laukas) ir dešinėje netelpa. */
+function SetRow({ label, desc, children, stack }) {
+  const head = (label || desc) ? (
+    <div style={{ minWidth: 0 }}>
+      {label ? <div style={{ fontSize: 14, fontWeight: 500, color: C.ink, lineHeight: 1.4 }}>{label}</div> : null}
+      {desc ? <div style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.45, marginTop: label ? 3 : 0 }}>{desc}</div> : null}
+    </div>
+  ) : null;
+  return (
+    <div style={{
+      padding: "13px 15px", display: stack ? "block" : "flex",
+      alignItems: "center", justifyContent: "space-between", gap: 12,
+    }}>
+      {head}
+      <div style={stack ? { marginTop: head ? 10 : 0 } : { flexShrink: 0 }}>{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Eilutė-nuoroda. Veiksmai, atidarantys kitą lapą, anksčiau buvo tamsūs per visą
+ * plotį mygtukai: keturi tokie sąraše skaitosi kaip keturi raginimai, nors nė vienas
+ * nėra tai, ko čia atėjai. Rodyklė pasako tą patį tyliau. Aukštis 48 px > 44 px taikinys.
+ */
+function SetNav({ label, onClick }) {
+  return (
+    <button className="press" onClick={onClick} style={{
+      width: "100%", padding: "14px 15px", display: "flex", alignItems: "center",
+      justifyContent: "space-between", gap: 12, textAlign: "left",
+      fontFamily: T.body, fontSize: 14, fontWeight: 500, color: C.ink,
+    }}>
+      <span>{label}</span>
+      <ChevronRight size={18} style={{ color: C.sub, flexShrink: 0 }} />
+    </button>
+  );
+}
+
 function SettingsSheet({ data, update, onReset, onClose, onFeedback, onBackup, onNotifHelp, onReplayTour, t }) {
   const s = { name: "", overdueMin: 60, lang: "lt", notify: true, backupRemind: true, ...(data.settings || {}) };
   const setS = (k, v) => update((d) => { d.settings = { name: "", overdueMin: 60, lang: "lt", notify: true, backupRemind: true, ...(d.settings || {}), [k]: v }; return d; });
+  // langas įrašomas visas: pakeitus tik vieną laiką, antras liktų neįrašytas, o
+  // būsenos pasiūlymui reikia abiejų. Prisilietimas prie lauko = langas nustatytas.
+  const setWin = (k, v) => update((d) => { d.settings = { name: "", overdueMin: 60, lang: "lt", notify: true, backupRemind: true, bedtime: "22:30", waketime: "07:00", ...(d.settings || {}), [k]: v }; return d; });
+  const winH = windowHours(s.bedtime || "22:30", s.waketime || "07:00");
   const [copied, setCopied] = useState(false);
   const [armed, setArmed] = useState(false);
   const [perm, setPerm] = useState("prompt");
@@ -2191,92 +2298,107 @@ function SettingsSheet({ data, update, onReset, onClose, onFeedback, onBackup, o
   };
   return (
     <Sheet title={t.settings} onClose={onClose} t={t}>
-      <PrimaryBtn color={C.ink} onClick={onReplayTour}>{t.replayTour}</PrimaryBtn>
-
-      <SectionLabel>{t.language}</SectionLabel>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {LANGS.map((l) => <Chip key={l.id} active={s.lang === l.id} onClick={() => setS("lang", l.id)}>{l.name}</Chip>)}
-      </div>
-
-      <SectionLabel>{t.theme}</SectionLabel>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {[["auto", t.thAuto], ["light", t.thLight], ["dark", t.thDark]].map(([id, label]) => (
-          <Chip key={id} active={(s.theme || "auto") === id} onClick={() => setS("theme", id)}>{label}</Chip>
-        ))}
-      </div>
-
-      <SectionLabel>{t.n.label}</SectionLabel>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.5 }}>{t.n.desc}</div>
-        <Segmented ariaLabel={t.n.label} value={s.notify && perm === "granted"}
-          onChange={(v) => { if (v !== (s.notify && perm === "granted")) toggleNotify(); }}
-          color={C.sage} soft={C.sageSoft}
-          options={[{ v: true, label: t.n.on }, { v: false, label: t.n.off }]} />
-      </div>
-      {!isNative() && <div style={{ fontSize: 12, color: C.amber, marginTop: 8 }}>{t.n.webOnly}</div>}
-      {isNative() && perm === "denied" && <div style={{ fontSize: 12, color: C.amber, marginTop: 8 }}>{t.n.denied}</div>}
-      {isNative() && (
-        <>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, fontSize: 13 }}>
-            <div style={{ color: C.sub }}>
-              {t.n.diag}: <b style={{ color: pend === 0 ? C.amber : C.ink }}>{pend === null ? "—" : pend === 0 ? t.n.diagNone : pend}</b>
-            </div>
-            <Chip active={false} onClick={async () => setPend(await pendingCount())}>{t.n.diagRun}</Chip>
+      <SetGroup style={{ marginTop: 2 }}>
+        <SetRow label={t.language} stack>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {LANGS.map((l) => <Chip key={l.id} active={s.lang === l.id} onClick={() => setS("lang", l.id)}>{l.name}</Chip>)}
           </div>
-          {/* žmogus čia atsiduria būtent tada, kai priminimai neveikia — gido skyrius
-              apie gamintojo energijos taupymą turi būti po ranka, o ne slėptis gido gale */}
-          <button className="press" onClick={onNotifHelp}
-            style={{ marginTop: 8, fontSize: 12.5, color: C.clayDark, textDecoration: "underline", textAlign: "left" }}>
-            {t.n.diagHelp}
-          </button>
-        </>
-      )}
+        </SetRow>
+        <SetRow label={t.theme} stack>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {[["auto", t.thAuto], ["light", t.thLight], ["dark", t.thDark]].map(([id, label]) => (
+              <Chip key={id} active={(s.theme || "auto") === id} onClick={() => setS("theme", id)}>{label}</Chip>
+            ))}
+          </div>
+        </SetRow>
+      </SetGroup>
 
-      <SectionLabel>{t.bed}</SectionLabel>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.5 }}>{t.bedDesc}</div>
-        <Segmented ariaLabel={t.bed} value={s.bedOn === true}
-          onChange={(v) => setS("bedOn", v)}
-          color={C.sage} soft={C.sageSoft}
-          options={[{ v: true, label: t.n.on }, { v: false, label: t.n.off }]} />
-      </div>
-      {s.bedOn === true && (
-        <input type="time" value={s.bedtime || "22:30"} onChange={(e) => setS("bedtime", e.target.value)}
-          aria-label={t.bed} style={{ ...inputStyle, marginTop: 10, maxWidth: 160 }} />
-      )}
-
-      <SectionLabel>{t.profile}</SectionLabel>
-      <input style={inputStyle} placeholder={t.namePh} value={s.name} onChange={(e) => setS("name", e.target.value)} />
-
-      <SectionLabel>{t.tMeds}</SectionLabel>
-      <div style={{ fontSize: 14, marginBottom: 8 }}>{t.overdueAfter}</div>
-      <div style={{ display: "flex", gap: 8 }}>
-        {[30, 60, 120].map((n) => <Chip key={n} active={s.overdueMin === n} onClick={() => setS("overdueMin", n)}>{n} min</Chip>)}
-      </div>
-
-      <SectionLabel>{t.data}</SectionLabel>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <PrimaryBtn color={C.ink} onClick={exportJson}>{copied ? t.copied : t.exportJson}</PrimaryBtn>
-        {!armed ? (
-          <button onClick={() => setArmed(true)} style={{ color: C.red, fontWeight: 600, fontSize: 14, padding: 10 }}>{t.deleteAll}</button>
-        ) : (
-          <PrimaryBtn color={C.red} onClick={() => { onReset(); onClose(); }}>{t.confirmAll}</PrimaryBtn>
+      <SetGroup label={t.n.label}>
+        <SetRow label={t.tMeds} desc={t.n.desc}>
+          <Segmented ariaLabel={t.n.label} value={s.notify && perm === "granted"}
+            onChange={(v) => { if (v !== (s.notify && perm === "granted")) toggleNotify(); }}
+            color={C.sage} soft={C.sageSoft}
+            options={[{ v: true, label: t.n.on }, { v: false, label: t.n.off }]} />
+        </SetRow>
+        {!isNative() && <SetRow stack><div style={{ fontSize: 12, color: C.amber }}>{t.n.webOnly}</div></SetRow>}
+        {isNative() && perm === "denied" && <SetRow stack><div style={{ fontSize: 12, color: C.amber }}>{t.n.denied}</div></SetRow>}
+        {isNative() && (
+          <SetRow label={<>{t.n.diag}: <b style={{ color: pend === 0 ? C.amber : C.ink }}>{pend === null ? "—" : pend === 0 ? t.n.diagNone : pend}</b></>}>
+            <Chip active={false} onClick={async () => setPend(await pendingCount())}>{t.n.diagRun}</Chip>
+          </SetRow>
         )}
-      </div>
+        {/* žmogus čia atsiduria būtent tada, kai priminimai neveikia — gido skyrius
+            apie gamintojo energijos taupymą turi būti po ranka, o ne slėptis gido gale */}
+        {isNative() && <SetNav label={t.n.diagHelp} onClick={onNotifHelp} />}
+        <SetRow label={t.bed} desc={t.bedDesc}>
+          <Segmented ariaLabel={t.bed} value={s.bedOn === true}
+            onChange={(v) => setS("bedOn", v)}
+            color={C.sage} soft={C.sageSoft}
+            options={[{ v: true, label: t.n.on }, { v: false, label: t.n.off }]} />
+        </SetRow>
+        {/* langas rodomas visada, ne tik įjungus priminimą: miegama ir tada, kai
+            pranešimo nereikia, o miego valandų pasiūlymas nuo priminimo nepriklauso.
+            „Nuo“ yra tas pats laikas, kuriuo siunčiamas priminimas, tad laukų du, ne trys. */}
+        <SetRow label={t.sleepWin} desc={t.sleepWinDesc} stack>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13, color: C.sub }}>{t.bedFrom}</span>
+            <input type="time" value={s.bedtime || "22:30"} onChange={(e) => setWin("bedtime", e.target.value)}
+              aria-label={`${t.sleepWin}, ${t.bedFrom}`} style={{ ...inputStyle, width: 122 }} />
+            <span style={{ fontSize: 13, color: C.sub }}>{t.bedTo}</span>
+            <input type="time" value={s.waketime || "07:00"} onChange={(e) => setWin("waketime", e.target.value)}
+              aria-label={`${t.sleepWin}, ${t.bedTo}`} style={{ ...inputStyle, width: 122 }} />
+            {winH != null && <span style={{ fontSize: 13, color: C.sub, fontVariantNumeric: "tabular-nums" }}>· {winH} h</span>}
+          </div>
+        </SetRow>
+      </SetGroup>
 
-      <SectionLabel>{t.backup}</SectionLabel>
-      <PrimaryBtn onClick={onBackup}>{t.backup}</PrimaryBtn>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, gap: 10 }}>
-        <div style={{ fontSize: 14 }}>{t.bkRemind}</div>
-        <Segmented ariaLabel={t.bkRemind} value={s.backupRemind !== false} onChange={(v) => setS("backupRemind", v)}
-          color={C.sage} soft={C.sageSoft} options={[{ v: true, label: t.n.on }, { v: false, label: t.n.off }]} />
-      </div>
+      <SetGroup label={t.profile}>
+        <SetRow stack>
+          <input style={inputStyle} placeholder={t.namePh} value={s.name} onChange={(e) => setS("name", e.target.value)} />
+        </SetRow>
+      </SetGroup>
 
-      <SectionLabel>{t.fbLabel}</SectionLabel>
-      <PrimaryBtn color={C.ink} onClick={onFeedback}>{t.fbBtn}</PrimaryBtn>
+      <SetGroup label={t.tMeds}>
+        <SetRow label={t.overdueAfter} stack>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[30, 60, 120].map((n) => <Chip key={n} active={s.overdueMin === n} onClick={() => setS("overdueMin", n)}>{n} min</Chip>)}
+          </div>
+        </SetRow>
+      </SetGroup>
 
-      <SectionLabel>{t.about}</SectionLabel>
-      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6 }}>{t.aboutText}</div>
+      <SetGroup label={t.data}>
+        <SetNav label={t.backup} onClick={onBackup} />
+        <SetRow label={t.bkRemind}>
+          <Segmented ariaLabel={t.bkRemind} value={s.backupRemind !== false} onChange={(v) => setS("backupRemind", v)}
+            color={C.sage} soft={C.sageSoft} options={[{ v: true, label: t.n.on }, { v: false, label: t.n.off }]} />
+        </SetRow>
+        {/* eksportas ir kopija daro beveik tą patį, tad eksportas lieka antriniu:
+            apvestas, ne užpildytas, kad kortelėje būtų vienas svarbiausias kelias */}
+        <SetRow stack>
+          <PrimaryBtn onClick={exportJson}
+            style={{ background: "transparent", border: `1px solid ${C.line}`, color: C.ink }}>
+            {copied ? t.copied : t.exportJson}
+          </PrimaryBtn>
+        </SetRow>
+        <SetRow stack>
+          {!armed ? (
+            <button className="press" onClick={() => setArmed(true)}
+              style={{ width: "100%", color: C.red, fontWeight: 600, fontSize: 14, padding: 10 }}>{t.deleteAll}</button>
+          ) : (
+            <PrimaryBtn color={C.red} onClick={() => { onReset(); onClose(); }}>{t.confirmAll}</PrimaryBtn>
+          )}
+        </SetRow>
+      </SetGroup>
+
+      {/* apžvalga ir atsiliepimas nėra tai, ko į nustatymus ateinama, tad jie apačioje.
+          Anksčiau „Peržiūrėti apžvalgą“ buvo pats pirmas ir tamsiausias elementas lape. */}
+      <SetGroup label={t.about}>
+        <SetNav label={t.replayTour} onClick={onReplayTour} />
+        <SetNav label={t.fbBtn} onClick={onFeedback} />
+        <SetRow stack>
+          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6 }}>{t.aboutText}</div>
+        </SetRow>
+      </SetGroup>
     </Sheet>
   );
 }
