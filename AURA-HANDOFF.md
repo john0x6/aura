@@ -1,8 +1,9 @@
-# Aura: projekto perdavimas (v1.6 / po commit'o „Aura V7“)
+# Aura: projekto perdavimas (v1.7 / po commit'o „Nustatymai kortelėse…“)
 
 Įklijuok šį failą į naują pokalbį. Kodas yra `C:\Users\Vartotojas\Desktop\aura`.
 
-Viskas užkomitinta į `main`. Prieš pradėdamas patikrink `git status` ir `git log --oneline -3`.
+Paskutinis darbas guli šakoje `nustatymai-priminimai-spalvos` (`2d4e350`), dar nesulietoje
+į `main`. Prieš pradėdamas patikrink `git status`, `git branch` ir `git log --oneline -3`.
 
 ---
 
@@ -21,12 +22,13 @@ debesies, analitikos. Nulis tinklo užklausų.
 ## Failų struktūra
 
 ```
-src/App.jsx           visa sąsaja + vertimai (~2670 eil.)
+src/App.jsx           visa sąsaja + vertimai (~3010 eil.)
 src/backup.js         eksportas/importas, schemaVersion validacija
 src/seizureTimer.js   priepuolio laikmatis (Preferences, sieninis laikrodis)
 src/notifications.js  vaistų priminimai, mėnesinis kopijos, miego priminimas
 src/dates.js          BENDROS datų funkcijos (dkey turi būti vienas!)
-src/native.js         splash, status bar, „atgal", grįžimas iš fono, temos spalvos
+src/native.js         splash, status bar, „atgal", grįžimas iš fono, temos spalvos,
+                      dalinimasis (shareText)
 src/storage.js        Preferences adapteris
 tools/make-icons.mjs  generuoja visas piktogramas iš formulės (npm run icons)
 .github/workflows/build-apk.yml   APK generavimas debesyje
@@ -40,6 +42,103 @@ pradžiai bei pabaigai. Nerašyk skirtuko ID tiesiai į tas vietas.
 ---
 
 ## Kas pasikeitė šioje sesijoje
+
+### Nustatymai sudėti į korteles
+- Iki tol tai buvo vienintelis ekranas, kur valdikliai kabo tiesiai ant fono, nors visur
+  kitur turinys sėdi ant `Card`. Devyni skyriai virto šešiomis kortelėmis.
+- Nauji `SetGroup`, `SetRow`, `SetNav` (`src/App.jsx`). Skirtukas tarp eilučių piešiamas
+  **grupėje, ne eilutėje**: keturios eilutės yra sąlyginės, ir eilutėje piešiamas brūkšnys
+  kartais pakibtų kortelės viršuje.
+- Keturi tamsūs per visą plotį mygtukai tapo eilutėmis su rodykle. „Peržiūrėti apžvalgą“
+  nukeltas iš pačio viršaus į „Apie“: tai ne tas dalykas, dėl kurio į nustatymus einama.
+
+### Miego langas
+- Nustatymuose „nuo“ ir „iki“ (`bedtime`, `waketime`). Iš jų Būsenos skirtuke pasiūlomos
+  miego valandos: 21:00–07:00 duoda 10 h.
+- **Reikšmė neįrašoma savaime**, tik pasiūloma paspaudžiama eilute. Tri-state išlieka:
+  automatiškai užpildytas miegas būtų ataskaitoje atsiradęs faktas, kurio niekas nepasakė.
+- Laikai visada matomi, nepriklausomai nuo miego priminimo jungiklio: langas prasmingas ir
+  tam, kas pranešimo nenori.
+- **Žinoma spraga:** kol nepajudini laiko lauko, `waketime` neįrašomas, tad pasiūlymas
+  nepasirodo, nors numatytieji 22:30–07:00 nustatymuose jau matosi.
+
+### Apžvalgos slinkimo klaida
+- Paslinkus puslapį apvedimo žiedas likdavo priklijuotas prie ekrano: `rect` matuojamas
+  vieną kartą per žingsnį ir yra taškas ekrane, o slinkti niekas nedraudė.
+- Dabar `lockScroll(true)` uždedamas **kartu su matavimu**, o prieš `scrollIntoView`
+  nuimamas: užrakintame puslapyje apžvalga pati nebegalėtų nuslinkti prie taikinio.
+- Atrakinama išeinant bet kuriuo keliu, įskaitant Escape ir taikinio neradimą. Sluoksnis
+  gavo `touchAction: "none"`: telefone `overflow` vienas neužtenka.
+- Naudinga žinoti: `overflow: hidden` stabdo tik vartotojo slinkimą, programinis
+  (`scrollIntoView`, `scrollTo`) veikia toliau. Patikrinta.
+
+### Priminimų jungikliai atjungti nuo vaistų
+- `syncBedtimeReminder` ir `syncBackupReminder` **nebepriklauso nuo `notify`**. Iki tol
+  išjungęs vaistų priminimus žmogus tyliai prarasdavo ir miego, ir kopijos priminimą, o
+  jų jungikliai toliau rodė „Įjungti“.
+- Leidimo dabar prašo kiekvienas jungiklis atskirai (`toggleRemind`). Iki tol klausė tik
+  vaistų, tad įjungus vien miego priminimą `syncBedtimeReminder` grįždavo su `perm` ir
+  nesuplanuodavo nieko, be jokio ženklo ekrane.
+- Naršyklėje leidimo neklausiama, kitaip jungiklis taptų nepaspaudžiamas kuriant.
+
+### Atsiliepimas
+- Prisegama **priminimų būklė**: `perm`, `pending`, `meds`, `bed`. Be jų „priminimai
+  neateina“ neatskiriamas nuo gamintojo apribojimo, ir kiekvienas laiškas kainuoja
+  papildomą susirašinėjimo ratą. `perm=granted` + `pending=0` reiškia planavimo klaidą,
+  `perm=granted` + `pending=54` reiškia, kad telefonas jų neparodo.
+- `navigator.platform` pakeistas `deviceInfo()`: Android WebView'e platform grąžina
+  procesoriaus architektūrą, vienodą visiems telefonams, o čia svarbiausias gamintojas.
+- `window.open(mailto, "_blank")` → `window.location.href`. WebView neprivalo turėti lango
+  taikinių apdorojimo, ir tada paspaudimas nedaro nieko.
+- **„Atsidarė pašto programa“ pašalinta** iš keturių kalbų: ji buvo rodoma besąlygiškai,
+  taip pat ir tada, kai neatsidarė niekas. Ar atsidarė, sužinoti neįmanoma.
+- Pridėtas „Siųsti kitaip“ per `@capacitor/share` (`shareText` faile `src/native.js`).
+  Tik telefone ir tik antru mygtuku: dalinimosi lange adresatą renkasi vartotojas.
+- Kortelė rodoma **visuose skirtukuose**, po turiniu. Viršuje Priepuolių skirtuke ji
+  nustumtų žemyn „Prasidėjo priepuolis“.
+
+### Ataskaita rodo dozių žymėjimo laiką
+- Naujas `doseDeviations()` + `DOSE_GRACE_MIN = 30`. Ataskaitoje: kiek dozių nukrypo
+  daugiau nei 30 min, vidutiniškai kiek ir daugiausia kiek, su kryptimi.
+- **Vadinama „Žymėjimo laikas“, ne gėrimo.** Programėlė mato paspaudimą, ne tabletę.
+  Paspaudus „Išgėriau“ pranešime jie beveik sutampa, vakare susižymint dienos dozes ne.
+- **`DOSE_GRACE_MIN` nėra klinikinė riba** ir taip parašyta komentare. Teisingas langas
+  priklauso nuo vaisto, o Aura neturi nė vieno jų farmakokinetikos. Eilutė be spalvos:
+  nukrypimas yra faktas, vertina neurologas.
+
+### Vertimai: 16 klaidų keturiose kalbose
+- **Penkios giminės formos:** LT `bedBody` „nusistatei **pats**“, PL `seizNote` „czułeś“,
+  `seizStaleNote` „zapomniałeś“, `bedBody` „ustawiłeś“, RU `ef.fall` „Упал(а)“.
+- **RU trys sakiniai** buvo su «X, это Y» be brūkšnio, kuris toje konstrukcijoje privalomas.
+  Kadangi brūkšnių vartoti negalima, perfrazuota, o ne pridėta skyryba.
+- **RU `gNotifB`** sakė „Aura не обязана работать“, tai yra priešingai, nei norėta.
+- **PL `rDays`** duodavo „1 dni“; kitos trys kalbos apsaugotos sutrumpinimais.
+- Linksniai: LT „ne **Auros** kopija“, PL „kopia zapasowa **Aury**“.
+- `setupIntro` LT ir PL pakeistas iš „pakeisi / zmienisz“ į galimybės formą. EN ir RU ją
+  turėjo nuo pradžių.
+
+### Paletė
+- **`plum` atskirtas nuo `blue`.** Jie buvo **ta pati reikšmė** abiejose temose, todėl
+  priepuolis ir kalendoriaus įrašas, o `CAT_COLOR` gydytojo vizitas ir operacija nesiskyrė
+  niekuo. Dabar `#6B4E8E` / `#BFA3D9`.
+- **Brūkšnelio kalendoriuje NEKEISK atgal į tašką.** Naujos spalvos šviesumo santykis prieš
+  `blue` tėra 1,02 ir 1,12: skiriasi atspalvis, ne šviesumas, tad spalvų neskiriančiam
+  žmogui jos ir toliau susilies. Forma tebėra vienintelis patikimas skirtukas.
+- `sage` ir `amber` patamsinti: ant savo `*Soft` fonų davė 4,24 ir 4,39, tai žemiau AA.
+  Tai buvo kiekvieno jungiklio „Įjungti“ būsena. Dabar **visos 23 teksto poros praeina AA**,
+  silpniausia 4,72 šviesioje ir 5,51 tamsioje.
+- Pridėtas **`lineStrong`** valdiklių kraštinėms (laukeliai, chip'ai, `Segmented`, `+/−`,
+  `DotScale`, dozės eilutė): 3,50 ir 3,45 ant kortelės, virš WCAG 3:1. `line` liko
+  skirtukams ir kortelėms, kad programėlės oras nesikeistų.
+- **`clay` pervadintas į `accent`** (27 vietos): jis petrolinis, ne molio spalvos, ir
+  prasilenkdavo su jau egzistavusiu `onAccent`. `plum` vardas paliktas, nes po spalvos
+  taisymo jis pagaliau teisingas.
+- **`CAT_COLOR.other` turėjo įrašytą literalą `#EBE9E0`**, ne kintamąjį, todėl
+  nepersijungdavo su tema: tamsioje `C.sub` ant jo davė 1,85:1. Dabar naujas `subSoft`.
+
+---
+
+## Kas pasikeitė ankstesnėje sesijoje
 
 ### Vaistų priminimai gavo veiksmo mygtuką
 - Pranešime yra **„Išgėriau"** (`DOSE_ACTION_TYPE`, `initActions`, `onDoseAction`
@@ -119,7 +218,7 @@ pradžiai bei pabaigai. Nerašyk skirtuko ID tiesiai į tas vietas.
 
 ---
 
-## Kas pasikeitė ankstesnėje sesijoje
+## Kas pasikeitė dar anksčiau
 
 ### Ženklas ir piktogramos
 - Senasis 12 spindulių ženklas buvo **tos pačios konstrukcijos kaip Claude logotipas**. Pakeistas.
@@ -140,7 +239,9 @@ pradžiai bei pabaigai. Nerašyk skirtuko ID tiesiai į tas vietas.
   (`setNativeTheme` gauna tikrą HEX).
 - `C.white` yra **paviršiaus**, ne baltumo žyma, tamsioje temoje ji tamsi. Tikras baltas įrašytas
   literalu tik apvedimo žiedui.
-- Visos 14 spalvų porų abiejose paletėse praeina **WCAG AA** (silpniausia 5,78:1).
+- Kontrastai perskaičiuoti šioje sesijoje: **visos 23 teksto poros praeina WCAG AA**,
+  silpniausia 4,72 šviesioje ir 5,51 tamsioje. Ankstesnis teiginys apie 5,78 negaliojo:
+  trys poros buvo žemiau 4,5. Prieš keisdamas bet kurią spalvą, perskaičiuok, o ne spėk.
 
 ### Pirmo paleidimo srautas
 - **Nustatymo ekranas** (`SetupSheet`): kalba, vardas, priminimų įjungimas. Rodomas tik pirmą kartą.
@@ -177,6 +278,8 @@ pradžiai bei pabaigai. Nerašyk skirtuko ID tiesiai į tas vietas.
 
 ### Fotosensityvumas
 - Paletė atitraukta nuo raudonos-oranžinės zonos abiejose temose.
+- **`plum` ir `blue` skiriasi atspalviu, bet ne šviesumu** (1,02 ir 1,12). Todėl kalendoriuje
+  priepuolio žymė yra brūkšnelis, o įrašo taškas. Spalvos atskyrimas šito nepakeitė.
 - **Jokių animacijų virš ~1 Hz.** Apvedimo fonas pritemsta vieną kartą per 600 ms ir nejuda,
   net keičiantis žingsniui. Todėl `Spotlight` niekada nevalo `rect`: nuvalius, ekranas kas žingsnį
   prašviesėtų ir vėl aptemtų.
@@ -204,6 +307,15 @@ pradžiai bei pabaigai. Nerašyk skirtuko ID tiesiai į tas vietas.
 - **`dkey()` bendras** `App.jsx` ir planuokliui.
 
 - **Pranešimų `extra` yra vienintelis kelias atgal į dozę.** ID yra maiša.
+- **Miego ir kopijos priminimai nepriklauso nuo `notify`.** Tas jungiklis nustatymuose
+  vadinasi „Vaistai“, ir jį išjungęs žmogus nesitiki prarasti kitų dviejų. Leidimo prašo
+  kiekvienas jungiklis atskirai.
+- **Apžvalgos metu puslapis užrakinamas.** `rect` yra taškas ekrane, tad slinkimas jį
+  sugadintų. Užraktas uždedamas kartu su matavimu, ne anksčiau.
+- **`DOSE_GRACE_MIN = 30` yra rodymo, ne klinikinė riba.** Vaisto langą žino gydytojas,
+  ne programėlė.
+- **`lineStrong` valdikliams, `line` skirtukams.** Kraštinė, rodanti būseną, privalo
+  turėti 3:1; kortelės kraštinei to nereikia ir su ja programėlė atrodytų sunkesnė.
 
 ### Tekstas
 - **Jokių ilgųjų brūkšnių (`—`) vartotojui matomame tekste.** Jie skamba kaip mašinos rašyti.
@@ -253,7 +365,19 @@ Reikia atskirti „rakto nėra“ nuo „raktas neparsina“. **Reikalauja spren
 Su `StrictMode` tai vykdoma du kartus. Dabar nekenkia, bet yra spąstai ateičiai.
 
 **4. Versijų nesutapimas.** `aboutText` visose keturiose kalbose sako „prototipas v1.4“,
-`package.json`, `0.6.0`. Patvirtinta, neištaisyta: reikia tavo sprendimo, koks numeris teisingas.
+`APP_VERSION` irgi „1.4“, o `package.json`, `0.6.0`. Patvirtinta, neištaisyta: reikia tavo
+sprendimo, koks numeris teisingas.
+
+**5. Miego langas nepasirodo su numatytaisiais laikais.** Būsenos pasiūlymas reikalauja
+įrašyto `waketime`, o jis įrašomas tik pajudinus laiko lauką. Nustatymuose 22:30–07:00
+matosi iš karto, tad atrodo, kad langas jau nustatytas. Reikia sprendimo: ar įrašyti
+numatytuosius per migraciją, ar rodyti pasiūlymą ir be įrašo.
+
+**6. Negyvas kodas, rastas audito metu, nepašalintas.** `d.calm` rašomas ir niekada
+neskaitomas; 10 vertimų raktų × 4 kalbos nenaudojami (`tWell`, `save`, `missed`, `auraYes`,
+`auraNo`, `doneMin`, `stoppedMin`, `sessions`, `minTotal`, `bkPick`); `Wind` importuojamas
+be reikalo; `aura-standalone.html` yra 638 KB senos versijos kopija repozitorijoje;
+`planNotifications` ir `safetyBackup` eksportuojami, nors naudojami tik savo moduliuose.
 
 ---
 
@@ -281,8 +405,31 @@ ir po valandos `seizStale` duos šiukšlinę trukmę.
 7. **„Išgėriau" mygtukas pranešime**: naršyklėje netikrinamas iš principo (`isNative()` = false).
    Patikrinta tik tai, kad `planNotifications` visiems 54 pranešimams prideda `actionTypeId`
    ir pilną `extra`. Ar mygtukas pasirodo ir ar klausytojas suveikia, tik APK'e.
+8. **Miego pranešimas nurodytu laiku.** Visa grandinė iki `LocalNotifications` naršyklėje
+   net nepaleidžiama. Kad ateitų 21:00, matysis tik APK'e.
+9. **Atsiliepimo siuntimas.** `mailto:` per `location.href` ir „Siųsti kitaip“ per
+   `@capacitor/share` abu yra native keliai. Naršyklėje patikrinta tik tai, kad
+   diagnostikos blokas susirenka teisingai ir kad dalinimosi mygtukas web'e nerodomas.
+10. **Apžvalgos slinkimo užraktas telefone.** Patikrinta naršyklėje: `body` ir `html`
+    `overflow` tampa `hidden` kartu su matavimu ir atsileidžia išeinant, o žiedo padėtis
+    sutampa su taikiniu per 6 px `pad`. Ar `touchAction: "none"` sustabdo pirštą realiame
+    WebView'e, nepatikrinta.
 
-### Kas patikrinta naršyklėje (ne telefone)
+### Kas patikrinta naršyklėje šioje sesijoje
+
+- Nustatymų kortelės abiejose temose, visos eilutės savo vietose.
+- Miego langas: įvedus 21:00–07:00, Būsenoje atsiranda „· 10 h“.
+- Apžvalga: žiedo padėtis 1, 2 ir 5 žingsniuose sutampa su taikiniu, užraktas uždedamas
+  ir atsileidžia.
+- Priepuolio registravimas, vaisto pridėjimas, dozės žymėjimas, ataskaita.
+- Dozių nukrypimas: 406, −234 ir 487 min duoda „3 iš 3 · vidutiniškai 6 h 16 min ·
+  daugiausia 8 h 7 min vėliau“. Aritmetika perskaičiuota ranka, sutampa.
+- Atsiliepimo kortelė matoma visuose keturiuose skirtukuose ir stovi žemiau
+  „Prasidėjo priepuolis“.
+- Paletė: visi vienuolika naujų ir pervadintų kintamųjų išsisprendžia abiejose temose,
+  `var(--c-clay*)` niekur neliko.
+
+### Kas patikrinta naršyklėje anksčiau (ne telefone)
 
 - Kalendoriaus priepuolių žymės, dienos kortelė, abu trukmės formatai (`dur` ir `durSec`).
 - Užrašų migracija: du tos pačios dienos užrašai sujungti, esama dienos pastaba nepaliesta,
@@ -345,3 +492,18 @@ patikrinti, o ne pasikliauti prielaida.**
 - **Apžvalgos žiedas vėluoja, kai žingsnis perjungia skirtuką.** Su 1,9 s pauze trys žingsniai
   atrodė „nepataikę“, nors žiedas tiesiog dar stovėjo ankstesnio žingsnio vietoje. Su 4 s visi
   aštuoni švarūs. Prieš skelbiant klaidą patikrink, ar žiedas nėra ties **ankstesniu** taikiniu.
+- **Nekomponuojant kadrų `behavior: "smooth"` neveikia visai.** `scrollTo` su „smooth“
+  lieka ties 0, o su „instant“ nuvažiuoja. Todėl apžvalgos žingsnis, kuriam reikia
+  nuslinkti, peržiūroje atrodo kaip klaida, nors kode viskas gerai.
+- **Matuok iš inline stiliaus, ne `getBoundingClientRect()`.** Tomis pačiomis sąlygomis
+  `rect` grąžina užstrigusią praeitą padėtį: žiedo stilius sakė `top: 74px`, o `rect`
+  rodė 740. Vos nepaskelbiau veikiančio kodo sugedusiu.
+- **`npm run build` nepagauna neapibrėžtų kintamųjų.** `doseAt` buvo neimportuotas, build
+  praėjo žaliai, o ataskaitos skirtukas lūžo į baltą ekraną. Po kiekvieno naujo modulio
+  kvietimo atsidaryk tą ekraną, o ne pasitikėk build'u.
+- **Konsolės klaidų buferis neišsivalo pats.** Po redagavimo ten kelias minutes gulėjo
+  `lockScroll is not defined` iš tarpinės HMR būsenos. Žiūrėk į modulio `?t=` žymę: mano
+  atveju klaidos buvo 59 s senesnės už tuo metu įkeltą modulį.
+- **Vartotojas gali naudotis programėle tuo pačiu metu.** Šioje sesijoje pasikeitė kalba,
+  vardas, tema ir duomenys man nieko nedarant. Prieš skelbiant „X neveikia“, patikrink,
+  ar būsena vis dar ta, kurią tikriesi.
