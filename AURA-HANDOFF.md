@@ -1,9 +1,9 @@
-# Aura: projekto perdavimas (v1.7 / po commit'o „Nustatymai kortelėse…“)
+# Aura: projekto perdavimas (v2.0 / ataskaita, sujungti priminimai, dozės pagal laiką)
 
 Įklijuok šį failą į naują pokalbį. Kodas yra `C:\Users\Vartotojas\Desktop\aura`.
 
-Paskutinis darbas guli šakoje `nustatymai-priminimai-spalvos` (`2d4e350`), dar nesulietoje
-į `main`. Prieš pradėdamas patikrink `git status`, `git branch` ir `git log --oneline -3`.
+Paskutinis darbas yra `main` šakoje. Prieš pradėdamas patikrink `git status`, `git branch`
+ir `git log --oneline -3`.
 
 ---
 
@@ -22,11 +22,12 @@ debesies, analitikos. Nulis tinklo užklausų.
 ## Failų struktūra
 
 ```
-src/App.jsx           visa sąsaja + vertimai (~3010 eil.)
+src/App.jsx           visa sąsaja + vertimai (~3060 eil.)
 src/backup.js         eksportas/importas, schemaVersion validacija
 src/seizureTimer.js   priepuolio laikmatis (Preferences, sieninis laikrodis)
 src/notifications.js  vaistų priminimai, mėnesinis kopijos, miego priminimas
-src/dates.js          BENDROS datų funkcijos (dkey turi būti vienas!)
+src/dates.js          BENDROS datų funkcijos (dkey turi būti vienas!), `doseInSchedule`,
+                      `doseFor`, pranešimų raktai
 src/native.js         splash, status bar, „atgal", grįžimas iš fono, temos spalvos,
                       dalinimasis (shareText)
 src/storage.js        Preferences adapteris
@@ -42,6 +43,127 @@ pradžiai bei pabaigai. Nerašyk skirtuko ID tiesiai į tas vietas.
 ---
 
 ## Kas pasikeitė šioje sesijoje
+
+Ataskaitos perstatymas, dvi naujos galimybės ir trys vartotojo praneštos klaidos.
+Visos trys klaidos buvo atkurtos naršyklėje prieš taisant.
+
+### Ataskaita gydytojui perstatyta
+
+Vartotojo pastaba: „atrodo labai komplikuota". Išmatuota telefono plotyje (375 px): viena
+kortelė, **12 vienodo svorio eilučių**, iš jų „Žymėjimo laikas" reikšmė lūžta į **4 eilutes**
+191 px stulpelyje, „Pasekmės" ir „Vaistų laikymasis" – į dvi. Priepuolių skaičius atrodė
+lygiai taip pat svarbiai kaip „Alkoholis · atsakyta 20 iš 30".
+
+- **Trys skyriai vietoj vienos lentelės:** Priepuoliai · Vaistai · Savijauta. Du pirmieji
+  turi po vieną didelį skaičių (priepuolių kiekis, laikymosi procentas), po jais – smulkmenos,
+  kurios tą skaičių paaiškina. Naujas `ReportBlock`.
+- **Ilga reikšmė gula PO etikete** (`Stat` su automatiniu `stack`, kai reikšmė > 26 simbolių).
+  Lentelė, kurios pusė langelių aukštesni už kitus, atrodo sudėtingesnė, nei yra.
+- **Priepuolių DATOS.** Iki tol ataskaita nesakė nė vienos: nei ekrane, nei tekste. Gydytojas
+  klausia ne „kiek", o „kada". Dabar `07-28, 07-21, 07-14` abiejose vietose.
+- **Ankstesnis toks pat langas** („Ankstesnės 30 d.: 4“). Rodomas TIK tada, kai dienyne yra
+  įrašų iš anksčiau nei langas prasideda. Kitaip „0" reikštų ne ramų mėnesį, o programėlę,
+  kurios dar nebuvo, ir gydytojas pamatytų pagerėjimą, kurio niekas nematavo.
+- **Jokio vertinimo.** Ankstesnis skaičius rodomas be rodyklių, be spalvos, be procentų:
+  tai faktas, ne išvada. Laikymosi procentas lieka vienintelis spalvintas — ten riba aritmetinė.
+- Vaistų sąrašas kortelėje eina eilutėmis su dozėmis prie laikų, ne etiketė–reikšmė pora.
+- Paaiškinimas apie apytikslį procentą rodomas tik tada, kai procentas apskritai yra.
+- Tekstinėje ataskaitoje `(73 iš 90 dozių) (skaičiuota 30 iš 30 d.)` dvigubi skliaustai
+  pakeisti į `· skaičiuota …`.
+
+**Kas SĄMONINGAI nekeista.** Ataskaita tebėra suvestinė, ne priepuolių sąrašas: pilnas
+sąrašas su tipais ir trukmėmis gyvena Priepuolių skirtuke, ir jo kartojimas ataskaitą vėl
+pailgintų. Jei gydytojui reikia detalių, jos yra `Pastabose` ir dienyne.
+
+### To paties laiko priminimai sujungti į vieną
+
+- Du vaistai 08:00 duodavo du vienodus pranešimus vienas ant kito, o po 30 min – dar du.
+  Realiai tai vienas veiksmas: išgeriama viskas, kas tuo metu geriama.
+- Pranešimo ID dabar eina per LAIKĄ, ne per vaistą (`slotKey`, `slotFollowKey` –
+  `src/dates.js`). `extra.medIds` yra masyvas, ir „Išgėriau" pažymi visus išvardytus.
+  Senos, dar prieš pakeitimą suplanuotos žinutės su `extra.medId` telefone gali gulėti iki
+  14 d., todėl `onDoseAction` priima abu pavidalus.
+- Kūne surašomi tik NEPAŽYMĖTI vaistai. Pažymėjus vieną iš dviejų, žinutės nutildyti
+  nebegalima – ją reikia perrašyti taip, kad liktų antrasis. Tam `cancelDose` ir
+  `restoreDose` pakeisti vienu `syncDoseSlot(meds, doseLog, t, time, dk, enabled)`:
+  atšaukia to laiko ID ir sudaro iš naujo.
+- **`doseLog` jam paduodamas JAU atnaujintas.** `update()` React būseną atnaujina vėliau,
+  o priminimui reikšmės reikia dabar, todėl kviečiantysis pats sudaro, kaip žurnalas
+  atrodys. Pranešimo klausytojas šviežius duomenis ir kalbą ima iš `dataRef` / `tRef`:
+  jis registruojamas vieną kartą ir kitaip matytų tik pirmąją būseną.
+- Pranešimų biudžetas dabar skaičiuojamas laikais, ne vaistais: penki vaistai dviem laikais
+  telpa į tiek pat pranešimų, kiek vienas vaistas. Anksčiau `MAX_PENDING` dalybas mažino
+  horizontą iki kelių dienų.
+
+### Skirtingos to paties vaisto dozės ryte ir vakare
+
+- Levetiracetamas 250 mg ryte ir 1000 mg vakare buvo įmanomas tik kaip du atskiri įrašai
+  tuo pačiu pavadinimu — dvigubas sąrašas ir dvigubas priminimas.
+- Naujas neprivalomas laukas `doses` (`{ "20:00": "1000 mg" }`). `dose` lieka bendra:
+  `doseFor(med, time)` grąžina laiko dozę arba bendrą. Seni įrašai `doses` neturi ir
+  elgiasi kaip anksčiau.
+- Formoje laikai laikomi eilutėmis `{ time, dose }`, ne dviem lygiagrečiais masyvais:
+  ištrynus 08:00 kartu turi dingti būtent jo dozė. Įrašant virsta `times` + `doses`.
+  Tuščias laukelis reiškia bendrą dozę, ir ji rodoma vietos ženkle.
+- Rodymas: kai visų laikų dozė ta pati, ji lieka kortelės antraštėje kaip anksčiau; kai
+  skiriasi — antraštėje jos nebėra, o kiekviena eilutė rodo savo. Ataskaitos tekste
+  atitinkamai `Levetiracetamas · 08:00 250 mg, 20:00 1000 mg`.
+- Dozės pakeitimas NEATSTATO `timesFrom` / `timesAt`: pasikeitė kiekis, ne grafikas.
+
+### Vaistas, pridėtas jau po dozės laiko, iškart „vėluodavo"
+
+- 19:21 įrašius vaistą su 08:00 laiku, ta diena iškart rodė „Vėluoja", o suvestinėje
+  atsirasdavo 0 % laikymosi. Dozės nebuvo praleista — jos tą dieną apskritai nebuvo.
+- Priežastis: `timesFrom` žymėjo tik DIENĄ (`todayKey()`), o vaistas pridedamas konkrečią
+  valandą. Visa įrašymo diena buvo skaitoma nuo vidurnakčio.
+- Naujas laukas `timesAt` (ISO akimirka) rašomas kartu su `timesFrom`. `doseInSchedule`
+  (`src/dates.js`) pirmą dieną lygina su ta akimirka, vėlesnėms dienoms atsako `true`.
+  Seni įrašai `timesAt` neturi ir elgiasi kaip anksčiau — migracijos nereikia.
+- Tokia dozė rodoma pilkai su „Nuo rytojaus" (`stLater`, visos keturios kalbos).
+  **Pažymėti ją vis tiek galima**: ryte išgertą tabletę vakare įrašo pats vartotojas, ir
+  pažymėta dozė visada skaitosi į abu skaičius.
+- `planNotifications` tokiai dozei nebeplanuoja nė pakartojimo: 08:20 pridėjus 08:00 vaistą,
+  08:30 ateidavo „nepažymėjai".
+- Laikymosi procentas dabar atmeta ir dar NEATĖJUSIAS šiandienos dozes (`cutoff` argumentas
+  `scheduledOn`). Vakarinė dozė 19:00 nėra praleista. Kai skaičiuoti nėra ko, rodoma „—",
+  ne „0 %".
+
+### Apžvalga („gidas") lūždavo, kai vaistų jau buvo
+
+- 5 žingsnis rodo „Pridėti vaistą". Su keliomis vaistų kortelėmis tas mygtukas nukeliauja
+  žemiau ekrano ribos, o apvedimo žiedas likdavo prie ankstesnio elemento arba visai už
+  ekrano. Puslapis tuo metu jau būdavo užrakintas — vartotojui likdavo tamsus ekranas.
+- Priežastis: `scrollIntoView({ behavior: "smooth" })` ir fiksuoti 420 ms iki matavimo.
+  Sklandus slinkimas trunka neapibrėžtai ilgai, o kai langas nepiešiamas, **nevyksta iš
+  viso** — tada matuojama sena vieta.
+- Dabar slenkama pačiam: `window.scrollTo(0, y)` be animacijos, matavimas po 60 ms.
+  Šuolis be judesio čia dar ir saugesnis fotosensityvumui.
+- Pataisytas ir v1.7 teiginys, kad „programinis slinkimas veikia ir užrakintame puslapyje":
+  `scrollTo` veikia, o `behavior: "smooth"` be piešiamo lango — ne.
+- Patikrinta: visi 8 žingsniai su dviem vaistais, žiedas sutampa su taikiniu per 6 px `pad`,
+  taikinys matomas ekrane, užraktas atsileidžia pabaigoje.
+
+### Tamsi tema: balta juosta viršuje ir apačioje
+
+- **Tai Android 15 pokytis, ne CSS klaida.** Nuo API 35 langas visada piešiamas po sistemos
+  juostomis, o `StatusBar.setBackgroundColor` yra tuščias veiksmas.
+- `adjustMarginsForEdgeToEdge: "auto"` (buvusi reikšmė) tokiu atveju apkarpo WebView
+  paraštėmis, o jas nuspalvina temos `Theme.AppCompat.DayNight` fonas — SISTEMOS, ne
+  programėlės tema. Pasirinkus tamsią temą šviesiame telefone viršus ir apačia lieka balti.
+- Dabar `"disable"`: WebView užima visą langą, o vietą juostoms palieka pati programėlė per
+  `--sa-top` / `--sa-bottom` (`env(safe-area-inset-*)`). Fonas visur savas, tema nesvarbu.
+- WebView `env()` reikšmes teisingai praneša tik nuo 140 versijos. Todėl `App.jsx` startuojant
+  pamatuoja zondu: jei gauna nulius, viršų paima iš `StatusBar.getInfo().height` (tikras dp),
+  apačiai lieka 24 px. Iki Android 15 langas įsprausdinamas pats, ir atsargos neįjungiamos
+  (`systemBarInsets` grąžina `null`).
+- Lapai (`Sheet`) ir pirmo paleidimo ekranas gavo apatinę atsargą: jie remiasi į ekrano kraštą.
+- **Neištestuota telefone.** Naršyklėje `--sa-*` išsisprendžia į 0 px ir maketas nepakito,
+  bet ar Xiaomi WebView praneša insets — matysis tik APK'e. Jei antraštė atsidurtų po
+  laikrodžiu, kaltas zondas: reiškia `env()` grąžino ne nulį, bet neteisingą reikšmę.
+
+---
+
+## Kas pasikeitė ankstesnėje sesijoje (v1.7)
 
 ### Nustatymai sudėti į korteles
 - Iki tol tai buvo vienintelis ekranas, kur valdikliai kabo tiesiai ant fono, nors visur
@@ -138,7 +260,7 @@ pradžiai bei pabaigai. Nerašyk skirtuko ID tiesiai į tas vietas.
 
 ---
 
-## Kas pasikeitė ankstesnėje sesijoje
+## Kas pasikeitė dar anksčiau (v1.6)
 
 ### Vaistų priminimai gavo veiksmo mygtuką
 - Pranešime yra **„Išgėriau"** (`DOSE_ACTION_TYPE`, `initActions`, `onDoseAction`
@@ -218,7 +340,7 @@ pradžiai bei pabaigai. Nerašyk skirtuko ID tiesiai į tas vietas.
 
 ---
 
-## Kas pasikeitė dar anksčiau
+## Kas pasikeitė seniau (v1.5 ir anksčiau)
 
 ### Ženklas ir piktogramos
 - Senasis 12 spindulių ženklas buvo **tos pačios konstrukcijos kaip Claude logotipas**. Pakeistas.
@@ -311,7 +433,22 @@ pradžiai bei pabaigai. Nerašyk skirtuko ID tiesiai į tas vietas.
   vadinasi „Vaistai“, ir jį išjungęs žmogus nesitiki prarasti kitų dviejų. Leidimo prašo
   kiekvienas jungiklis atskirai.
 - **Apžvalgos metu puslapis užrakinamas.** `rect` yra taškas ekrane, tad slinkimas jį
-  sugadintų. Užraktas uždedamas kartu su matavimu, ne anksčiau.
+  sugadintų. Užraktas uždedamas kartu su matavimu, ne anksčiau. Slenkama tik `scrollTo`
+  be animacijos: `behavior: "smooth"` nepiešiamame lange nevyksta, ir matuojama sena vieta.
+- **`adjustMarginsForEdgeToEdge: "disable"`.** Capacitor paraštes nuspalvina sistemos
+  DayNight fonu, ne programėlės tema, todėl tamsi tema šviesiame telefone gaudavo baltas
+  juostas. Vietą juostoms palieka pati programėlė (`--sa-top`, `--sa-bottom`). Grąžinus
+  „auto", baltos juostos grįš.
+- **Ankstesnio laikotarpio skaičius rodomas tik turint senesnių įrašų.** Be šios sąlygos
+  programėlės pradžia atrodytų kaip priepuolių padažnėjimas, o dienyno pradžia – kaip nulis.
+- **Vienas priminimas vienam laikui, ne vienam vaistui.** ID eina per laiką (`slotKey`),
+  kūne surašomi tik nepažymėti vaistai, „Išgėriau" pažymi juos visus. Grąžinus atskirus
+  pranešimus, du vaistai vėl duotų dvi vienodas žinutes vienas ant kitos.
+- **`doses` yra papildymas, ne pakeitimas.** `dose` lieka bendra vaisto dozė, `doses`
+  nurodo tik tuos laikus, kurie skiriasi. Skaityti visada per `doseFor(med, time)`.
+- **Dozė galioja nuo `timesAt`, ne nuo dienos pradžios.** Vaistas pridedamas konkrečią
+  valandą; iki jos tos dienos dozių nebuvo. Pažymėta dozė skaitosi visada, net prieš
+  `timesAt`.
 - **`DOSE_GRACE_MIN = 30` yra rodymo, ne klinikinė riba.** Vaisto langą žino gydytojas,
   ne programėlė.
 - **`lineStrong` valdikliams, `line` skirtukams.** Kraštinė, rodanti būseną, privalo
@@ -410,12 +547,45 @@ ir po valandos `seizStale` duos šiukšlinę trukmę.
 9. **Atsiliepimo siuntimas.** `mailto:` per `location.href` ir „Siųsti kitaip“ per
    `@capacitor/share` abu yra native keliai. Naršyklėje patikrinta tik tai, kad
    diagnostikos blokas susirenka teisingai ir kad dalinimosi mygtukas web'e nerodomas.
-10. **Apžvalgos slinkimo užraktas telefone.** Patikrinta naršyklėje: `body` ir `html`
+10. **Sujungtas priminimas telefone.** Naršyklėje patikrinta tik `planNotifications` ir
+    `slotNotifications` išvestis. Ar viena žinutė su dviem vaistais atrodo gerai ir ar
+    „Išgėriau" pažymi abu, matysis tik APK'e. Ten pat matysis ir tai, kaip atrodo perėjimas:
+    telefone dar gulinčios senos žinutės turi `extra.medId`.
+11. **Edge-to-edge Android 15 telefone.** `adjustMarginsForEdgeToEdge: "disable"` ir
+    `--sa-top` / `--sa-bottom`. Naršyklėje insets yra 0 px, tad tikrinta tik tai, kad
+    maketas nepakito. Telefone matysis dvejopai: ar juostų vietoje dabar programėlės fonas,
+    ir ar antraštė su skirtukų juosta nepakliuvo po sistemos juostomis.
+12. **Apžvalgos slinkimo užraktas telefone.** Patikrinta naršyklėje: `body` ir `html`
     `overflow` tampa `hidden` kartu su matavimu ir atsileidžia išeinant, o žiedo padėtis
     sutampa su taikiniu per 6 px `pad`. Ar `touchAction: "none"` sustabdo pirštą realiame
     WebView'e, nepatikrinta.
 
 ### Kas patikrinta naršyklėje šioje sesijoje
+
+- Du vaistai tuo pačiu 08:00 laiku: abi kortelės rodo savo dozes atskirai, `doseLog` raktai
+  (`medId@time`) nesusiduria.
+- Ataskaita su 5 priepuoliais, 2 vaistais ir 40 d. dienos įrašų: trys skyriai, du dideli
+  skaičiai, „Žymėjimo laikas" ir „Pasekmės" gula po etikete per visą plotį. 90 d. lange
+  „Ankstesnės 90 d." eilutės nėra, nes dienyne nėra tiek senų įrašų — būtent taip ir turi būti.
+- Tuščias dienynas: „Priepuoliai 0" ir laikotarpis, daugiau nieko. Be lūžių, be tuščių kortelių.
+- Tekstinė ataskaita abiem langais: datos, ankstesnis langas, vaistai su dozėmis prie laikų.
+- `planNotifications` su dviem vaistais 08:00 ir vienu 20:00 duoda 56 pranešimus 14 dienų:
+  po vieną kiekvienam laikui plius pakartojimas. 08:00 kūnas – „Levetiracetamas 500 mg ·
+  Lamotriginas 100 mg", `extra.medIds` abu. Pažymėjus vieną, tas pats laikas persidaro į
+  „Lamotriginas 100 mg" su vienu ID.
+- Skirtingos dozės: forma įkelia 08:00 tuščią su vietos ženklu „500 mg" ir 20:00 „1000 mg";
+  įrašius atsiranda `doses` žemėlapis, `timesFrom` nepasikeičia; kortelė rodo dozes prie
+  laikų, o Lamotriginas su viena doze – antraštėje. Ataskaitos tekstas abiem pavidalais.
+- Dozės laukelis telefono plotyje (375 px): laikas 124 px, dozė 161 px, šalinimo mygtukas
+  telpa.
+- 19:21 pridėtas vaistas su 08:00 laiku rodo „Nuo rytojaus", ne „Vėluoja"; suvestinė rodo „—".
+  Pažymėjus tą dozę: „Išgerta 1 iš 3", 100 %.
+- 08-18 pridėtas vaistas tą pačią akimirką rodo „Vėluoja" — sena elgsena nesugadinta.
+- Apžvalga su dviem vaistais: visi 8 žingsniai, žiedas ties taikiniu, taikinys ekrane.
+- `--sa-top` / `--sa-bottom` išsisprendžia į 0 px, skirtukų juostos ir lapų maketas nepakitęs.
+- `npm run build` praeina.
+
+### Kas patikrinta naršyklėje v1.7 sesijoje
 
 - Nustatymų kortelės abiejose temose, visos eilutės savo vietose.
 - Miego langas: įvedus 21:00–07:00, Būsenoje atsiranda „· 10 h“.

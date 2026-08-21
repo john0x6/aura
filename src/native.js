@@ -24,6 +24,31 @@ export async function initStatusBar() {
 }
 
 /**
+ * Sistemos juostų atsargos, kai WebView jų nepraneša per CSS `env()`.
+ *
+ * Nuo Android 15 langas visada piešiamas PO būsenos ir naršymo juostomis —
+ * atsisakyti to nebegalima. Capacitor tokiu atveju siūlo apkarpyti WebView
+ * paraštėmis (`adjustMarginsForEdgeToEdge`), bet tos paraštės nuspalvinamos
+ * sistemos DayNight fonu, o ne programėlės tema: pasirinkus tamsią temą
+ * šviesiame telefone viršus ir apačia likdavo balti. Todėl paraštės išjungtos,
+ * o vietą juostoms palieka pati programėlė.
+ *
+ * `env(safe-area-inset-*)` tam ir skirtas, tik WebView jį teisingai praneša nuo
+ * 140 versijos. Senesnėje gaunam nulius, ir antraštė atsidurtų po laikrodžiu.
+ * Tada viršų imam iš `StatusBar.getInfo()` (tikras dp aukštis), o apačiai lieka
+ * gestų juostos plotis. Iki Android 15 langas įsprausdinamas pats, ir jokių
+ * atsargų nereikia.
+ */
+export async function systemBarInsets() {
+  if (!isNative() || !isAndroid()) return null;
+  const m = /Android (\d+)/.exec(navigator.userAgent || "");
+  if (!m || Number(m[1]) < 15) return null;
+  let top = 0;
+  try { top = (await StatusBar.getInfo()).height || 0; } catch (e) { /* liks atsarginis */ }
+  return { top: top || 28, bottom: 24 };
+}
+
+/**
  * Būsenos juosta perpiešiama kartu su tema. Spalva paduodama HEX, ne CSS
  * kintamuoju: čia jau native pusė, ir `var(--c-bg)` jai nieko nereiškia.
  *

@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useMemo, Children } from "react";
 import { load as loadData, save as saveData, clear as clearData } from "./storage";
 import { syncMedReminders, initChannel, permissionState, requestPermission, isNative,
-         cancelDose, restoreDose, pendingCount, FOLLOWUP_MIN } from "./notifications";
-import { pad, dkey, todayKey, addDays, doseAt } from "./dates";
+         syncDoseSlot, pendingCount, FOLLOWUP_MIN } from "./notifications";
+import { pad, dkey, todayKey, addDays, doseAt, dayFrom, doseInSchedule, doseFor } from "./dates";
 import { syncBackupReminder, syncBedtimeReminder, initActions, onDoseAction } from "./notifications";
 import { exportBackup, validateBackup, restoreBackup } from "./backup";
 import { startTimer, loadTimer, clearTimer, elapsedSec, isStale, fmtDuration, bucketOf, ALERT_SEC } from "./seizureTimer";
-import { hideSplash, initStatusBar, setNativeTheme, onBackButton, onResume, exitApp, shareText } from "./native";
+import { hideSplash, initStatusBar, setNativeTheme, onBackButton, onResume, exitApp, shareText, systemBarInsets } from "./native";
 import { Pill, Zap, Activity, Plus, X, Check, Trash2, Minus, Wind, CalendarDays, ChevronLeft, ChevronRight, Play, Square, FileText, Settings as Cog, Pencil, Pause, AlertTriangle } from "lucide-react";
 
 // ---------- design tokens: Claude-style ----------
@@ -80,6 +80,11 @@ const GLOBAL_CSS = `
 @media (prefers-color-scheme: dark) {
   :root[data-theme="auto"] { ${THEME_VARS(PALETTE.dark)} }
 }
+/* Vieta sistemos juostoms. Per kintamuosius, o ne tiesiai env(): Android 15
+   WebView senesnėje nei 140 versijoje praneša nulius, ir tada reikšmes įrašo
+   JS (žr. systemBarInsets). Nuo jų priklauso, ar antraštė nepakliūva po
+   laikrodžiu, o skirtukų juosta – po naršymo juosta. */
+:root { --sa-top: env(safe-area-inset-top, 0px); --sa-bottom: env(safe-area-inset-bottom, 0px); }
 html, body { background: var(--c-bg); }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 body { margin: 0; }
@@ -118,6 +123,7 @@ const STR = {
     inDays: (n) => `po ${n} d.`, passed: "praėjo", allDay: "visą dieną", close: "Uždaryti", del: "Ištrinti",
     prev: "Ankstesnis mėnuo", next: "Kitas mėnuo", less: "Mažiau", more: "Daugiau",
     newMed: "Naujas vaistas", medName: "Pavadinimas, pvz. Levetiracetamas", medDose: "Dozė, pvz. 500 mg",
+    doseHint: "Jei rytinė ir vakarinė dozė skiriasi, įrašyk ją prie laiko.",
     times: "Vartojimo laikai", addTime: "Pridėti laiką", removeTime: "Pašalinti laiką", saveMed: "Išsaugoti vaistą",
     todayIs: "Šiandien", medsEmptyT: "Kol kas tuščia",
     medsEmptyB: "Pridėk vaistą su vartojimo laikais, ir dienos dozes pažymėsi vienu paspaudimu.",
@@ -144,6 +150,7 @@ const STR = {
     rStressFat: "Stresas / nuovargis", rOf5: "(iš 5)", rAlco: "Alkoholis", rDays: (n) => `${n} d.`, copyText: "Kopijuoti kaip tekstą",
     rNote: "Vaistų laikymasis skaičiuojamas pagal dabartinį vaistų sąrašą, todėl laikotarpiui iki vaisto pridėjimo jis apytikslis.",
     rTitle: (n) => `AURA · ${n} d. ataskaita`, rPatient: "Pacientas", rFooter: "Duomenys registruoti paties paciento programėle Aura.",
+    rDates: "Datos", rPrevL: (n) => `Ankstesnės ${n} d.`, rDosesN: (a, b) => `${a} iš ${b} dozių`,
     rAdhLine: (p, t, s) => `VAISTAI: laikymasis ~${p}% (${t} iš ${s} dozių)`,
     rDoseTime: "Žymėjimo laikas",
     rDoseTimeV: (off, n, g, avg, max, late) => off === 0
@@ -160,7 +167,7 @@ const STR = {
     sumDemo: "Pavyzdys: čia atsiras tavo duomenys",
     sumWhy: "Bloknotas kaupia įrašus. Aura iš jų suskaičiuoja tai, ko gydytojui reikia: vaistų laikymosi procentą, trigerius pagal dažnį ir miegą prieš priepuolius.",
     sumOpen: "Atidaryti ataskaitą",
-    stTaken: "Išgerta", stLate: "Vėluoja", stSoon: "Laukia",
+    stTaken: "Išgerta", stLate: "Vėluoja", stSoon: "Laukia", stLater: "Nuo rytojaus",
     fbLabel: "Atsiliepimas", fbBtn: "Rašyti kūrėjui", fbSubj: "Aura: atsiliepimas",
     fbNote: "Atsidarys tavo el. pašto programa. Prisegama tik programėlės ir priminimų būklė, dienyno įrašai nesiunčiami.",
     pause: "Pauzė", resume: "Tęsti", paused: "Pristabdyta", quickLog: "Registruoti priepuolį",
@@ -218,6 +225,7 @@ const STR = {
     inDays: (n) => `in ${n} d.`, passed: "passed", allDay: "all day", close: "Close", del: "Delete",
     prev: "Previous month", next: "Next month", less: "Less", more: "More",
     newMed: "New medication", medName: "Name, e.g. Levetiracetam", medDose: "Dose, e.g. 500 mg",
+    doseHint: "If the morning and evening dose differ, enter it next to the time.",
     times: "Dose times", addTime: "Add time", removeTime: "Remove time", saveMed: "Save medication",
     todayIs: "Today", medsEmptyT: "Nothing here yet",
     medsEmptyB: "Add a medication with its times, then mark each dose with a single tap.",
@@ -244,6 +252,7 @@ const STR = {
     rStressFat: "Stress / fatigue", rOf5: "(of 5)", rAlco: "Alcohol", rDays: (n) => `${n} d.`, copyText: "Copy as text",
     rNote: "Adherence is calculated from your current medication list, so it is approximate for periods before a medication was added.",
     rTitle: (n) => `AURA · ${n}-day report`, rPatient: "Patient", rFooter: "Data self-recorded by the patient using the Aura app.",
+    rDates: "Dates", rPrevL: (n) => `Previous ${n} d.`, rDosesN: (a, b) => `${a} of ${b} doses`,
     rAdhLine: (p, t, s) => `MEDICATION: adherence ~${p}% (${t} of ${s} doses)`,
     rDoseTime: "Marking times",
     rDoseTimeV: (off, n, g, avg, max, late) => off === 0
@@ -260,7 +269,7 @@ const STR = {
     sumDemo: "Example: your data will appear here",
     sumWhy: "A notepad collects entries. Aura turns them into what your doctor needs: adherence percentage, triggers ranked by frequency, and sleep before seizures.",
     sumOpen: "Open report",
-    stTaken: "Taken", stLate: "Late", stSoon: "Due",
+    stTaken: "Taken", stLate: "Late", stSoon: "Due", stLater: "From tomorrow",
     fbLabel: "Feedback", fbBtn: "Email the developer", fbSubj: "Aura: feedback",
     fbNote: "Opens your email app. Only the app and reminder status are attached, no diary entries are sent.",
     pause: "Pause", resume: "Resume", paused: "Paused", quickLog: "Log a seizure",
@@ -316,6 +325,7 @@ const STR = {
     inDays: (n) => `через ${n} д.`, passed: "прошло", allDay: "весь день", close: "Закрыть", del: "Удалить",
     prev: "Предыдущий месяц", next: "Следующий месяц", less: "Меньше", more: "Больше",
     newMed: "Новое лекарство", medName: "Название, напр. Леветирацетам", medDose: "Доза, напр. 500 мг",
+    doseHint: "Если утренняя и вечерняя дозы разные, впишите её рядом со временем.",
     times: "Время приёма", addTime: "Добавить время", removeTime: "Убрать время", saveMed: "Сохранить лекарство",
     todayIs: "Сегодня", medsEmptyT: "Пока пусто",
     medsEmptyB: "Добавьте лекарство со временем приёма, и дозы можно будет отмечать одним касанием.",
@@ -342,6 +352,7 @@ const STR = {
     rStressFat: "Стресс / усталость", rOf5: "(из 5)", rAlco: "Алкоголь", rDays: (n) => `${n} д.`, copyText: "Скопировать как текст",
     rNote: "Соблюдение приёма считается по текущему списку лекарств, поэтому для периода до добавления лекарства оно приблизительно.",
     rTitle: (n) => `AURA · отчёт за ${n} д.`, rPatient: "Пациент", rFooter: "Данные записаны самим пациентом в приложении Aura.",
+    rDates: "Даты", rPrevL: (n) => `Предыдущие ${n} д.`, rDosesN: (a, b) => `${a} из ${b} доз`,
     rAdhLine: (p, t, s) => `ЛЕКАРСТВА: соблюдение ~${p}% (${t} из ${s} доз)`,
     rDoseTime: "Время отметок",
     rDoseTimeV: (off, n, g, avg, max, late) => off === 0
@@ -358,7 +369,7 @@ const STR = {
     sumDemo: "Пример: здесь появятся ваши данные",
     sumWhy: "Блокнот накапливает записи. Aura считает из них то, что нужно врачу: процент соблюдения приёма, триггеры по частоте и сон перед приступами.",
     sumOpen: "Открыть отчёт",
-    stTaken: "Принято", stLate: "Опаздывает", stSoon: "Ожидает",
+    stTaken: "Принято", stLate: "Опаздывает", stSoon: "Ожидает", stLater: "С завтра",
     fbLabel: "Отзыв", fbBtn: "Написать разработчику", fbSubj: "Aura: отзыв",
     fbNote: "Откроется почтовое приложение. Прилагается только состояние приложения и напоминаний, записи дневника не отправляются.",
     pause: "Пауза", resume: "Продолжить", paused: "Приостановлено", quickLog: "Записать приступ",
@@ -414,6 +425,7 @@ const STR = {
     inDays: (n) => `za ${n} dni`, passed: "minęło", allDay: "cały dzień", close: "Zamknij", del: "Usuń",
     prev: "Poprzedni miesiąc", next: "Następny miesiąc", less: "Mniej", more: "Więcej",
     newMed: "Nowy lek", medName: "Nazwa, np. Lewetyracetam", medDose: "Dawka, np. 500 mg",
+    doseHint: "Jeśli dawka poranna i wieczorna się różnią, wpisz ją obok godziny.",
     times: "Pory przyjmowania", addTime: "Dodaj porę", removeTime: "Usuń porę", saveMed: "Zapisz lek",
     todayIs: "Dziś", medsEmptyT: "Na razie pusto",
     medsEmptyB: "Dodaj lek wraz z porami, a dawki oznaczysz jednym dotknięciem.",
@@ -442,6 +454,7 @@ const STR = {
     rStressFat: "Stres / zmęczenie", rOf5: "(z 5)", rAlco: "Alkohol", rDays: (n) => `${n} ${n === 1 ? "dzień" : "dni"}`, copyText: "Kopiuj jako tekst",
     rNote: "Przestrzeganie liczone jest na podstawie bieżącej listy leków, więc dla okresu przed dodaniem leku jest przybliżone.",
     rTitle: (n) => `AURA · raport z ${n} dni`, rPatient: "Pacjent", rFooter: "Dane zapisane samodzielnie przez pacjenta w aplikacji Aura.",
+    rDates: "Daty", rPrevL: (n) => `Poprzednie ${n} dni`, rDosesN: (a, b) => `${a} z ${b} dawek`,
     rAdhLine: (p, t, s) => `LEKI: przestrzeganie ~${p}% (${t} z ${s} dawek)`,
     rDoseTime: "Pory oznaczeń",
     rDoseTimeV: (off, n, g, avg, max, late) => off === 0
@@ -458,7 +471,7 @@ const STR = {
     sumDemo: "Przykład: tu pojawią się Twoje dane",
     sumWhy: "Notatnik gromadzi wpisy. Aura wylicza z nich to, czego potrzebuje lekarz: procent przestrzegania, wyzwalacze według częstości i sen przed napadami.",
     sumOpen: "Otwórz raport",
-    stTaken: "Przyjęte", stLate: "Spóźnione", stSoon: "Oczekuje",
+    stTaken: "Przyjęte", stLate: "Spóźnione", stSoon: "Oczekuje", stLater: "Od jutra",
     fbLabel: "Opinia", fbBtn: "Napisz do autora", fbSubj: "Aura: opinia",
     fbNote: "Otworzy się aplikacja pocztowa. Dołączany jest tylko stan aplikacji i przypomnień, wpisy z dziennika nie są wysyłane.",
     pause: "Pauza", resume: "Kontynuuj", paused: "Wstrzymane", quickLog: "Zapisz napad",
@@ -513,8 +526,8 @@ const localeOf = (lang) => (LANGS.find((l) => l.id === lang) || LANGS[0]).locale
 // pranešimų ir jų nustatymų tekstai
 const NOTIF = {
   lt: {
-    title: "Laikas išgerti vaistus", body: (m) => `${m.name}${m.dose ? " · " + m.dose : ""}`,
-    fuTitle: "Dozė nepažymėta", fuBody: (m) => `${m.name}: ar tikrai išgėrei?`,
+    title: "Laikas išgerti vaistus", body: (list) => list.join(" · "),
+    fuTitle: "Dozė nepažymėta", fuBody: (list) => `${list.join(" · ")}: ar tikrai išgėrei?`,
     // mygtukas pačiame pranešime; belytė forma, kad tiktų visiems
     actTaken: "Išgėriau",
     channel: "Vaistų priminimai", label: "Priminimai",
@@ -527,8 +540,8 @@ const NOTIF = {
     webOnly: "Priminimai veikia tik įdiegus programėlę telefone.",
   },
   en: {
-    title: "Time to take your medication", body: (m) => `${m.name}${m.dose ? " · " + m.dose : ""}`,
-    fuTitle: "Dose not marked", fuBody: (m) => `${m.name}: did you actually take it?`,
+    title: "Time to take your medication", body: (list) => list.join(" · "),
+    fuTitle: "Dose not marked", fuBody: (list) => `${list.join(" · ")}: did you actually take it?`,
     actTaken: "Taken",
     channel: "Medication reminders", label: "Reminders",
     bkTitle: "Time to back up", bkBody: "Your diary is stored only on this phone.", bkChannel: "Backup reminders",
@@ -540,8 +553,8 @@ const NOTIF = {
     webOnly: "Reminders only work in the installed mobile app.",
   },
   ru: {
-    title: "Время принять лекарство", body: (m) => `${m.name}${m.dose ? " · " + m.dose : ""}`,
-    fuTitle: "Доза не отмечена", fuBody: (m) => `${m.name}: вы действительно приняли?`,
+    title: "Время принять лекарство", body: (list) => list.join(" · "),
+    fuTitle: "Доза не отмечена", fuBody: (list) => `${list.join(" · ")}: вы действительно приняли?`,
     actTaken: "Выпито",
     channel: "Напоминания о лекарствах", label: "Напоминания",
     bkTitle: "Сделайте резервную копию", bkBody: "Дневник хранится только на этом телефоне.", bkChannel: "Напоминания о копиях",
@@ -553,8 +566,8 @@ const NOTIF = {
     webOnly: "Напоминания работают только в установленном приложении.",
   },
   pl: {
-    title: "Czas wziąć lek", body: (m) => `${m.name}${m.dose ? " · " + m.dose : ""}`,
-    fuTitle: "Dawka nieoznaczona", fuBody: (m) => `${m.name}: czy dawka została przyjęta?`,
+    title: "Czas wziąć lek", body: (list) => list.join(" · "),
+    fuTitle: "Dawka nieoznaczona", fuBody: (list) => `${list.join(" · ")}: czy dawka została przyjęta?`,
     actTaken: "Zażyte",
     channel: "Przypomnienia o lekach", label: "Przypomnienia",
     bkTitle: "Zrób kopię zapasową", bkBody: "Dziennik jest przechowywany tylko na tym telefonie.", bkChannel: "Przypomnienia o kopiach",
@@ -659,7 +672,15 @@ const medIds = (data) => new Set(data.meds.map((m) => m.id));
 // Nuo kada galioja dabartiniai vaisto laikai. Senesnėms dienoms grafiko NEŽINOM,
 // todėl jos į laikymosi vardiklį neįtraukiamos — kitaip šiandien pridėtas vaistas
 // paverstų visą praėjusį mėnesį „0 %“, o laikų pakeitimas nubrauktų procentą be priežasties.
-const scheduledOn = (meds, dk) => meds.reduce((a, m) => a + ((m.timesFrom || "0000-00-00") <= dk ? m.times.length : 0), 0);
+// Kiek vieno vaisto dozių tą dieną skaitosi. Pažymėta dozė skaitosi visada –
+// net jei vaistas įrašytas po jos laiko: vartotojas pats pasakė, kad išgėrė.
+// `cutoff` atmeta dar neatėjusias dozes: šiandienos vakarinė dozė nėra praleista.
+const countTimes = (m, dk, doseLog, cutoff) => m.times.filter((x) => {
+  if (doseLog?.[dk]?.[`${m.id}@${x}`]) return true;
+  if (!doseInSchedule(m, dk, x)) return false;
+  return !cutoff || doseAt(dayFrom(dk), x) <= cutoff;
+}).length;
+const scheduledOn = (meds, dk, doseLog, cutoff) => meds.reduce((a, m) => a + countTimes(m, dk, doseLog, cutoff), 0);
 
 /**
  * Kiek dozė gali nukrypti nuo numatyto laiko, kad tai dar nebūtų verta minėti.
@@ -811,7 +832,7 @@ function Sheet({ title, onClose, children, t }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: C.sh4 }} />
-      <div style={{ position: "relative", width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", background: C.bg, borderRadius: "18px 18px 0 0", padding: "18px 18px 28px", boxShadow: `0 -4px 24px ${C.sh2}` }}>
+      <div style={{ position: "relative", width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", background: C.bg, borderRadius: "18px 18px 0 0", padding: "18px 18px calc(28px + var(--sa-bottom))", boxShadow: `0 -4px 24px ${C.sh2}` }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div style={{ fontFamily: T.serif, fontSize: 20, fontWeight: 600 }}>{title}</div>
           <button onClick={onClose} aria-label={t.close} style={iconBtn}><X size={20} /></button>
@@ -892,43 +913,62 @@ function SummaryStrip({ data, t, onOpen }) {
 }
 
 // ---------- meds ----------
+/**
+ * Laikai laikomi eilutėmis `{ time, dose }`, o ne dviem lygiagrečiais masyvais:
+ * dozė priklauso laikui, ir ištrynus 08:00 kartu turi dingti būtent jo dozė.
+ * Įrašant eilutės virsta `times` masyvu ir `doses` žemėlapiu — taip senas
+ * įrašų pavidalas lieka nepaliestas, o naujas laukas yra tik papildymas.
+ */
 function MedForm({ initial, onSave, onClose, t }) {
   const [name, setName] = useState(initial?.name || "");
   const [dose, setDose] = useState(initial?.dose || "");
-  const [times, setTimes] = useState(initial?.times ? [...initial.times] : ["08:00"]);
-  const setTime = (i, v) => setTimes(times.map((x, j) => (j === i ? v : x)));
-  const valid = name.trim() && times.length > 0 && times.every((x) => x);
+  const [rows, setRows] = useState(initial?.times
+    ? initial.times.map((x) => ({ time: x, dose: (initial.doses && initial.doses[x]) || "" }))
+    : [{ time: "08:00", dose: "" }]);
+  const setRow = (i, k, v) => setRows(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+  const valid = name.trim() && rows.length > 0 && rows.every((r) => r.time);
   return (
     <Sheet title={initial ? t.editMed : t.newMed} onClose={onClose} t={t}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <input style={inputStyle} placeholder={t.medName} value={name} onChange={(e) => setName(e.target.value)} />
         <input style={inputStyle} placeholder={t.medDose} value={dose} onChange={(e) => setDose(e.target.value)} />
         <SectionLabel style={{ margin: "8px 4px 0" }}>{t.times}</SectionLabel>
-        {times.map((x, i) => (
+        <div style={{ fontSize: 12.5, color: C.sub, margin: "-4px 4px 0", lineHeight: 1.45 }}>{t.doseHint}</div>
+        {rows.map((r, i) => (
           <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input type="time" style={{ ...inputStyle, flex: 1 }} value={x} onChange={(e) => setTime(i, e.target.value)} />
-            {times.length > 1 && (
-              <button onClick={() => setTimes(times.filter((_, j) => j !== i))} aria-label={t.removeTime} style={{ padding: 10, color: C.sub }}><X size={18} /></button>
+            <input type="time" style={{ ...inputStyle, width: 124, flexShrink: 0 }} value={r.time} onChange={(e) => setRow(i, "time", e.target.value)} />
+            {/* tuščias laukas reiškia bendrą dozę, todėl ji ir rodoma vietos ženkle */}
+            <input style={{ ...inputStyle, flex: 1, minWidth: 0 }} placeholder={dose.trim() || t.dose}
+              aria-label={`${t.dose} ${r.time}`} value={r.dose} onChange={(e) => setRow(i, "dose", e.target.value)} />
+            {rows.length > 1 && (
+              <button onClick={() => setRows(rows.filter((_, j) => j !== i))} aria-label={t.removeTime} style={{ padding: 10, color: C.sub, flexShrink: 0 }}><X size={18} /></button>
             )}
           </div>
         ))}
-        <button onClick={() => setTimes([...times, "20:00"])} style={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 6, color: C.accent, fontWeight: 600, fontSize: 14, padding: 4 }}>
+        <button onClick={() => setRows([...rows, { time: "20:00", dose: "" }])} style={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 6, color: C.accent, fontWeight: 600, fontSize: 14, padding: 4 }}>
           <Plus size={16} /> {t.addTime}
         </button>
         <PrimaryBtn disabled={!valid} onClick={() => {
-          const nt = [...times].sort();
+          const sorted = [...rows].sort((a, b) => a.time.localeCompare(b.time));
+          const nt = sorted.map((r) => r.time);
+          const doses = {};
+          sorted.forEach((r) => { if (r.dose.trim()) doses[r.time] = r.dose.trim(); });
           const changed = !initial || JSON.stringify(initial.times) !== JSON.stringify(nt);
-          onSave({ ...(initial || {}), id: initial?.id || uid(), name: name.trim(), dose: dose.trim(), times: nt,
-                   timesFrom: changed ? todayKey() : initial.timesFrom });
+          onSave({ ...(initial || {}), id: initial?.id || uid(), name: name.trim(), dose: dose.trim(), times: nt, doses,
+                   // data pasako, nuo kurios dienos galioja laikai, o `timesAt` – nuo kurios
+                   // akimirkos: be jos vakare pridėta rytinė dozė iškart „vėluotų“
+                   timesFrom: changed ? todayKey() : initial.timesFrom,
+                   timesAt: changed ? new Date().toISOString() : initial.timesAt });
         }}>{t.saveMed}</PrimaryBtn>
       </div>
     </Sheet>
   );
 }
 
-function DoseRow({ time, takenAt, overdue, onToggle, t }) {
+function DoseRow({ time, dose, takenAt, overdue, later, onToggle, t }) {
   const taken = !!takenAt;
   const accent = taken ? C.accent : overdue ? C.amber : C.line;
+  const state = taken ? t.stTaken : later ? t.stLater : overdue ? t.stLate : t.stSoon;
   return (
     <button className="press" onClick={onToggle} aria-pressed={taken} aria-label={`${t.dose} ${time}`}
       style={{
@@ -939,16 +979,18 @@ function DoseRow({ time, takenAt, overdue, onToggle, t }) {
       }}>
       <div style={{
         fontFamily: T.serif, fontSize: 21, fontWeight: 700, minWidth: 62,
-        fontVariantNumeric: "tabular-nums", color: taken ? C.accentDark : C.ink,
+        fontVariantNumeric: "tabular-nums", color: taken ? C.accentDark : later ? C.sub : C.ink,
       }}>{time}</div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: taken ? C.accentDark : overdue ? C.amber : C.sub }}>
-          {taken ? t.stTaken : overdue ? t.stLate : t.stSoon}
+          {state}
         </div>
-        {taken && (
+        {/* dozė rodoma tik tada, kai laikai skiriasi: kai ji visur ta pati, jos
+            vieta yra kortelės antraštėje, o čia ji kartotųsi kiekvienoje eilutėje */}
+        {(dose || taken) && (
           <div style={{ fontSize: 12, color: C.sub, fontVariantNumeric: "tabular-nums" }}>
-            {new Date(takenAt).toTimeString().slice(0, 5)}
+            {[dose, taken ? new Date(takenAt).toTimeString().slice(0, 5) : null].filter(Boolean).join(" · ")}
           </div>
         )}
       </div>
@@ -971,24 +1013,26 @@ function MedsView({ data, update, t, lc, onReport, timer, onEndTimer, onDiscardT
   const log = data.doseLog[tk] || {};
   const now = new Date();
   const odMin = data.settings?.overdueMin ?? 60;
-  const totalToday = data.meds.reduce((a, m) => a + m.times.length, 0);
+  const totalToday = data.meds.reduce((a, m) => a + countTimes(m, tk, data.doseLog), 0);
   const takenToday = data.meds.reduce((a, m) => a + m.times.filter((x) => log[`${m.id}@${x}`]).length, 0);
   const WD = wdShort(lc);
 
   const toggle = (medId, time) => {
-    const med = data.meds.find((m) => m.id === medId);
-    const wasTaken = !!log[`${medId}@${time}`];
+    const k = `${medId}@${time}`;
+    const wasTaken = !!log[k];
     update((d) => {
       const day = d.doseLog[tk] || {};
-      const k = `${medId}@${time}`;
       if (day[k]) delete day[k]; else day[k] = new Date().toISOString();
       d.doseLog[tk] = day;
       return d;
     });
-    // pažymėjus – nutildom šios dozės priminimą ir jos pakartojimą;
-    // atšaukus pažymėjimą – grąžinam, jei laikas dar nepraėjo
-    if (wasTaken) { if (med) restoreDose(med, time, tk, t); }
-    else cancelDose(medId, time, tk);
+    // Priminimas yra bendras visam laikui, tad nutildyti vienos dozės nebeišeina:
+    // pažymėjus vieną iš dviejų 08:00 vaistų, žinutė turi likti, tik su antruoju.
+    // Todėl perplanuojam visą tą laiką pagal žurnalą, kuris tuoj įsigalios —
+    // `update` būseną atnaujina vėliau, o priminimui reikšmės reikia dabar.
+    const next = { ...log };
+    if (wasTaken) delete next[k]; else next[k] = new Date().toISOString();
+    syncDoseSlot(data.meds, { ...data.doseLog, [tk]: next }, t, time, tk, data.settings?.notify !== false);
   };
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(now, i - 6));
@@ -1012,12 +1056,18 @@ function MedsView({ data, update, t, lc, onReport, timer, onEndTimer, onDiscardT
         </Card>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {data.meds.map((m) => (
+        {data.meds.map((m) => {
+          // tas pats vaistas ryte ir vakare gali būti geriamas skirtingu kiekiu:
+          // tada dozė keliauja prie kiekvieno laiko, o antraštėje jos nelieka
+          const sameDose = m.times.every((x) => doseFor(m, x) === doseFor(m, m.times[0]));
+          return (
           <Card key={m.id}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
               <div>
                 <div style={{ fontFamily: T.serif, fontWeight: 600, fontSize: 17 }}>{m.name}</div>
-                {m.dose && <div style={{ fontSize: 13, color: C.sub }}>{m.dose}</div>}
+                {sameDose && doseFor(m, m.times[0]) && (
+                  <div style={{ fontSize: 13, color: C.sub }}>{doseFor(m, m.times[0])}</div>
+                )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
               <button className="press" onClick={() => setEditing(m)} aria-label={t.edit} style={iconBtn}><Pencil size={16} /></button>
@@ -1036,11 +1086,18 @@ function MedsView({ data, update, t, lc, onReport, timer, onEndTimer, onDiscardT
                 const takenAt = log[`${m.id}@${x}`];
                 const [hh, mm] = x.split(":").map(Number);
                 const due = new Date(now); due.setHours(hh, mm, 0, 0);
-                return <DoseRow key={x} t={t} time={x} takenAt={takenAt} overdue={!takenAt && now - due > odMin * 60000} onToggle={() => toggle(m.id, x)} />;
+                // vaistas įrašytas jau po šio laiko: dozės šiandien nebuvo, tad
+                // nei „vėluoja“, nei skaičiuojasi. Pažymėti vis tiek galima —
+                // ryte išgertą tabletę vakare įrašo pats vartotojas.
+                const later = !takenAt && !doseInSchedule(m, tk, x);
+                return <DoseRow key={x} t={t} time={x} takenAt={takenAt} later={later}
+                  dose={sameDose ? "" : doseFor(m, x)}
+                  overdue={!takenAt && !later && now - due > odMin * 60000} onToggle={() => toggle(m.id, x)} />;
               })}
             </div>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {totalToday > 0 && (
@@ -1056,7 +1113,7 @@ function MedsView({ data, update, t, lc, onReport, timer, onEndTimer, onDiscardT
             <div style={{ display: "flex", gap: 8 }}>
               {days.map((d) => {
                 const k = dkey(d);
-                const sched = scheduledOn(data.meds, k);
+                const sched = scheduledOn(data.meds, k, data.doseLog);
                 const taken = Math.min(takenOn(data, k, medIds(data)), sched || 1);
                 const full = sched > 0 && taken >= sched;
                 const some = taken > 0 && !full;
@@ -1770,11 +1827,28 @@ function buildReport(data, days, t) {
   const auraAns = seiz.filter((s) => s.aura === true || s.aura === false).length;
   const durMax = [...DURATIONS].reverse().find((d) => seiz.some((s) => s.dur === d)) || null;
 
+  // Datos yra vienintelis dalykas, kurio suvestinė iki šiol nepasakė, o gydytojas
+  // klausia pirmiausia: ne „kiek“, o „kada ir ar dažniau“.
+  const seizDates = seiz.map((s) => new Date(s.at)).sort((a, b) => b - a);
+
+  /* Ankstesnis lygiai toks pat langas – bet tik tada, kai dienynas tada jau
+     egzistavo. Kitaip „0“ reikštų ne ramų mėnesį, o programėlę, kurios dar
+     nebuvo, ir gydytojas pamatytų pagerėjimą, kurio niekas nematavo. */
+  const firstDay = [
+    ...Object.keys(data.daily), ...Object.keys(data.doseLog),
+    ...data.seizures.map((s) => dkey(new Date(s.at))),
+  ].reduce((a, b) => (a && a < b ? a : b), null);
+  const prevN = firstDay && firstDay < dkey(since)
+    ? data.seizures.filter((s) => { const at = new Date(s.at); return at >= addDays(now, -2 * days) && at < since; }).length
+    : null;
+
   const ids = medIds(data);
   let taken = 0, scheduled = 0, adhDays = 0;
   for (let i = 0; i < days; i++) {
     const k = dkey(addDays(now, -i));
-    const perDay = scheduledOn(data.meds, k);
+    // `now` kaip riba: šiandienos dar neatėjusi dozė nėra nei išgerta, nei
+    // praleista. Be jos ką tik pridėtas vaistas iškart rodytų 0 %.
+    const perDay = scheduledOn(data.meds, k, data.doseLog, now);
     if (!perDay) continue;                 // tą dieną grafiko nežinom – neįtraukiam
     adhDays += 1;
     scheduled += perDay;
@@ -1819,6 +1893,8 @@ function buildReport(data, days, t) {
   if (data.settings?.name) L.push(`${t.rPatient}: ${data.settings.name}`);
   L.push("");
   L.push(`${t.rSeiz.toUpperCase()}: ${seiz.length}`);
+  if (seiz.length) L.push(`  ${t.rDates}: ${seizDates.map((d) => dkey(d).slice(5)).join(", ")}`);
+  if (prevN != null) L.push(`  ${t.rPrevL(days)}: ${prevN}`);
   if (seiz.length) {
     L.push(`  ${t.rTypes}: ${fmt(types)}`);
     L.push(`  ${t.rAura}: ${auraN} / ${auraAns || seiz.length}` + (auraAns < seiz.length ? ` (${t.rAnswered(auraAns, seiz.length)})` : ""));
@@ -1829,8 +1905,15 @@ function buildReport(data, days, t) {
   }
   L.push("");
   if (adh != null) {
-    L.push(t.rAdhLine(adh, taken, scheduled) + ` (${t.rAdhDays(adhDays, days)})`);
-    data.meds.forEach((m) => L.push(`  ${m.name}${m.dose ? " " + m.dose : ""} · ${m.times.join(", ")}`));
+    L.push(t.rAdhLine(adh, taken, scheduled) + ` · ${t.rAdhDays(adhDays, days)}`);
+    data.meds.forEach((m) => {
+      const ds = m.times.map((x) => doseFor(m, x));
+      // skirtingos dozės surašomos prie laikų: „500 mg · 08:00, 20:00" nutylėtų,
+      // kad vakare geriama dvigubai, o gydytojui tai yra pati esmė
+      L.push(ds.every((d) => d === ds[0])
+        ? `  ${m.name}${ds[0] ? " " + ds[0] : ""} · ${m.times.join(", ")}`
+        : `  ${m.name} · ${m.times.map((x, i) => (ds[i] ? `${x} ${ds[i]}` : x)).join(", ")}`);
+    });
     if (devs.length) {
       L.push(`  ${t.rDoseTime}: ${t.rDoseTimeV(off.length, devs.length, DOSE_GRACE_MIN,
         devAvg == null ? null : fmtMin(devAvg), devMax == null ? null : fmtMin(devMax), devMax > 0)}`);
@@ -1847,16 +1930,57 @@ function buildReport(data, days, t) {
   }
   L.push("");
   L.push(t.rFooter);
-  return { text: L.join("\n"), seiz, types, trigs, effs, auraN, auraAns, auraKinds, alcoAns, adhDays, durMax, adh, taken, scheduled, sleepAvg, shortN, sleepsN: sleeps.length, stressAvg, fatAvg, alcoN, notes,
+  return { text: L.join("\n"), seiz, seizDates, prevN, since, types, trigs, effs, auraN, auraAns, auraKinds, alcoAns, adhDays, durMax, adh, taken, scheduled, sleepAvg, shortN, sleepsN: sleeps.length, stressAvg, fatAvg, alcoN, notes,
            devN: devs.length, devOff: off.length, devAvg, devMax };
 }
 
-function Stat({ label, value, color = C.ink }) {
+/**
+ * Ataskaitos eilutė. Ilga reikšmė gula PO etikete, o ne į siaurą dešinį stulpelį:
+ * „21 iš 73 nukrypo daugiau nei 30 min…“ telefone lūžta į keturias eilutes, ir
+ * lentelė, kurioje pusė langelių aukštesni už kitus, atrodo sudėtingesnė, nei yra.
+ */
+function Stat({ label, value, color = C.ink, first }) {
+  const stack = typeof value === "string" && value.length > 26;
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 2px", borderBottom: `1px solid ${C.line}`, fontSize: 14 }}>
+    <div style={{
+      display: stack ? "block" : "flex", justifyContent: "space-between", gap: 12,
+      padding: "9px 2px", borderTop: first ? "none" : `1px solid ${C.line}`, fontSize: 14,
+    }}>
       <div style={{ color: C.sub, flexShrink: 0 }}>{label}</div>
-      <div style={{ fontWeight: 600, color, textAlign: "right" }}>{value}</div>
+      <div style={{ fontWeight: 600, color, textAlign: stack ? "left" : "right",
+                    marginTop: stack ? 3 : 0, lineHeight: 1.45 }}>{value}</div>
     </div>
+  );
+}
+
+/**
+ * Skyrius su vienu dideliu skaičiumi ir po juo einančiomis eilutėmis.
+ *
+ * Iki tol visa ataskaita buvo viena dvylikos eilučių lentelė, kurioje priepuolių
+ * skaičius atrodė lygiai taip pat svarbiai kaip „Alkoholis · atsakyta 20 iš 30“.
+ * Dabar hierarchija yra: du skaičiai, dėl kurių viskas ir renkama, ir po jais –
+ * smulkmenos, kurios juos paaiškina.
+ */
+function ReportBlock({ title, value, sub, color, rows = [], children }) {
+  const list = rows.filter(Boolean);
+  return (
+    <>
+      <SectionLabel>{title}</SectionLabel>
+      <Card style={{ padding: "13px 15px" }}>
+        {value != null && (
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ fontFamily: T.serif, fontSize: 32, fontWeight: 700, lineHeight: 1, color: color || C.ink }}>{value}</div>
+            {sub && <div style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.45 }}>{sub}</div>}
+          </div>
+        )}
+        {children}
+        {list.length > 0 && (
+          <div style={{ marginTop: value != null || children ? 10 : 0 }}>
+            {list.map(([label, v, c], i) => <Stat key={label} label={label} value={v} color={c} first={i === 0 && value == null && !children} />)}
+          </div>
+        )}
+      </Card>
+    </>
   );
 }
 
@@ -1869,28 +1993,63 @@ function ReportSheet({ data, onClose, t }) {
     try { await navigator.clipboard.writeText(r.text); setCopied(true); setTimeout(() => setCopied(false), 2500); }
     catch (e) { setCopied(false); }
   };
+
+  const seizRows = [
+    r.seiz.length > 0 && [t.rDates, r.seizDates.map((d) => dkey(d).slice(5)).join(", ")],
+    r.prevN != null && [t.rPrevL(days), String(r.prevN)],
+    r.seiz.length > 0 && [t.rTypes, fmt(r.types)],
+    r.seiz.length > 0 && [t.rAura, `${r.auraN} / ${r.auraAns || r.seiz.length}`],
+    r.durMax && [t.rLongest, r.durMax],
+    r.auraKinds.length > 0 && [t.rAuraKinds, fmt(r.auraKinds)],
+    r.effs.length > 0 && [t.effects, fmt(r.effs)],
+    r.trigs.length > 0 && [t.triggers, fmt(r.trigs)],
+  ];
+  const wellRows = [
+    r.sleepAvg != null && [t.rSleep, t.rSleepV(r.sleepAvg, r.shortN, r.sleepsN)],
+    (r.stressAvg != null || r.fatAvg != null) && [t.rStressFat, `${r.stressAvg ?? "—"} / ${r.fatAvg ?? "—"} ${t.rOf5}`],
+    r.alcoAns > 0 && [t.rAlco, `${t.rDays(r.alcoN)} · ${t.rAnswered(r.alcoAns, days)}`],
+  ];
+
   return (
     <Sheet title={t.report} onClose={onClose} t={t}>
-      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+      <div style={{ display: "flex", gap: 8 }}>
         {[30, 90].map((n) => <Chip key={n} active={days === n} onClick={() => setDays(n)}>{t.rDays(n)}</Chip>)}
       </div>
-      <Card style={{ padding: "4px 14px" }}>
-        <Stat label={t.rSeiz} value={r.seiz.length} color={C.plum} />
-        {r.seiz.length > 0 && <Stat label={t.rTypes} value={fmt(r.types)} />}
-        {r.seiz.length > 0 && <Stat label={t.rAura} value={`${r.auraN} / ${r.auraAns || r.seiz.length}`} />}
-        {r.auraKinds.length > 0 && <Stat label={t.rAuraKinds} value={fmt(r.auraKinds)} />}
-        {r.durMax && <Stat label={t.rLongest} value={r.durMax} />}
-        {r.effs.length > 0 && <Stat label={t.effects} value={fmt(r.effs)} />}
-        {r.trigs.length > 0 && <Stat label={t.triggers} value={fmt(r.trigs)} />}
-        {r.adh != null && <Stat label={t.rAdh} value={`~${r.adh}% · ${t.rAdhDays(r.adhDays, days)}`} color={r.adh >= 90 ? C.sage : C.amber} />}
-        {/* be spalvos sąmoningai: nukrypimas nuo laiko yra faktas, ne įvertinimas.
-            Laikymosi procentas spalvinamas todėl, kad ten riba yra aritmetinė. */}
-        {r.devN > 0 && <Stat label={t.rDoseTime} value={t.rDoseTimeV(r.devOff, r.devN, DOSE_GRACE_MIN,
-          r.devAvg == null ? null : fmtMin(r.devAvg), r.devMax == null ? null : fmtMin(r.devMax), r.devMax > 0)} />}
-        {r.sleepAvg != null && <Stat label={t.rSleep} value={t.rSleepV(r.sleepAvg, r.shortN, r.sleepsN)} />}
-        {(r.stressAvg != null || r.fatAvg != null) && <Stat label={t.rStressFat} value={`${r.stressAvg ?? "—"} / ${r.fatAvg ?? "—"} ${t.rOf5}`} />}
-        {r.alcoAns > 0 && <Stat label={t.rAlco} value={`${t.rDays(r.alcoN)} · ${t.rAnswered(r.alcoAns, days)}`} />}
-      </Card>
+
+      <ReportBlock title={t.rSeiz} value={r.seiz.length} color={C.plum} rows={seizRows}
+        sub={`${dkey(r.since).slice(5)} – ${dkey(new Date()).slice(5)}`} />
+
+      {r.adh != null && (
+        <ReportBlock title={t.tMeds} value={`~${r.adh}%`} color={r.adh >= 90 ? C.sage : C.amber}
+          sub={`${t.rDosesN(r.taken, r.scheduled)} · ${t.rAdhDays(r.adhDays, days)}`}
+          rows={[
+            // be spalvos sąmoningai: nukrypimas nuo laiko yra faktas, ne įvertinimas.
+            // Laikymosi procentas spalvinamas todėl, kad ten riba yra aritmetinė.
+            r.devN > 0 && [t.rDoseTime, t.rDoseTimeV(r.devOff, r.devN, DOSE_GRACE_MIN,
+              r.devAvg == null ? null : fmtMin(r.devAvg), r.devMax == null ? null : fmtMin(r.devMax), r.devMax > 0)],
+          ]}>
+          {/* vaistų sąrašas eilutėmis, ne etiketė–reikšmė: čia nėra ką lyginti,
+              o dozės prie laikų netelpa į dešinį stulpelį */}
+          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+            {data.meds.map((m) => {
+              const ds = m.times.map((z) => doseFor(m, z));
+              const same = ds.every((z) => z === ds[0]);
+              return (
+                <div key={m.id} style={{ fontSize: 13.5, lineHeight: 1.45 }}>
+                  <span style={{ fontWeight: 600 }}>{m.name}</span>
+                  <span style={{ color: C.sub }}>
+                    {same ? `${ds[0] ? " " + ds[0] : ""} · ${m.times.join(", ")}`
+                          : ` · ${m.times.map((z, i) => (ds[i] ? `${z} ${ds[i]}` : z)).join(", ")}`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </ReportBlock>
+      )}
+
+      {wellRows.some(Boolean) && <ReportBlock title={t.tWell} rows={wellRows} />}
+
       {r.notes.length > 0 && (
         <>
           <SectionLabel>{t.rNotes}</SectionLabel>
@@ -1905,7 +2064,8 @@ function ReportSheet({ data, onClose, t }) {
         </>
       )}
       <PrimaryBtn onClick={copy} style={{ marginTop: 14 }}>{copied ? t.copied : t.copyText}</PrimaryBtn>
-      <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>{t.rNote}</div>
+      {/* paaiškinimas apie apytikslį procentą – tik tada, kai procentas apskritai rodomas */}
+      {r.adh != null && <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>{t.rNote}</div>}
     </Sheet>
   );
 }
@@ -2011,7 +2171,7 @@ function SeizureTimer({ timer, t, onEnd, onDiscard, onConfirmStale }) {
 function SetupSheet({ t, lang, name, notify, perm, onLang, onName, onNotify, onDone }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 130, background: C.bg, overflowY: "auto" }}>
-      <div style={{ maxWidth: 480, margin: "0 auto", padding: "calc(34px + env(safe-area-inset-top)) 20px 40px" }}>
+      <div style={{ maxWidth: 480, margin: "0 auto", padding: "calc(34px + var(--sa-top)) 20px calc(40px + var(--sa-bottom))" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <AuraMark size={40} />
           <div>
@@ -2122,9 +2282,18 @@ function Spotlight({ target, label, hint, onClose, t, step, total, onNext, onSki
       if (box.top >= 0 && box.bottom <= window.innerHeight) {
         setTimeout(() => measure(el), 30);
       } else {
-        lockScroll(false);   // užrakintame puslapyje `scrollIntoView` nieko nepadarytų
-        el.scrollIntoView({ block: "center", behavior: "smooth" });
-        setTimeout(() => measure(el), 420);
+        lockScroll(false);   // užrakintame puslapyje slinkti neišeitų
+        // Slenkam patys ir IŠKART, o ne `scrollIntoView({ behavior: "smooth" })`.
+        // Sklandus slinkimas trunka neapibrėžtai ilgai, o kai langas nepiešiamas,
+        // nevyksta iš viso — tada po fiksuotų 420 ms buvo išmatuojama sena vieta.
+        // Rezultatas: žiedas lieka prie ankstesnio elemento arba už ekrano ribų,
+        // o puslapis tuo metu jau užrakintas ir vartotojas nebeturi ką daryti.
+        // Ilgesniame sąraše („Pridėti vaistą“ po kelių vaistų kortelių) taip
+        // nutikdavo kiekvieną kartą. Šuolis be animacijos čia dar ir saugesnis:
+        // jokio judesio, kurio vengia fotosensityvumas.
+        const y = window.scrollY + box.top - Math.max(0, (window.innerHeight - box.height) / 2);
+        window.scrollTo(0, Math.max(0, y));
+        setTimeout(() => measure(el), 60);
       }
     };
     find();
@@ -2642,6 +2811,26 @@ export default function App() {
   useEffect(() => { loadTimer().then(setTimer); }, []);
   const [quickLog, setQuickLog] = useState(0);
 
+  // Vieta sistemos juostoms. Pirma pasitikrinam, ar WebView `env()` reikšmes
+  // apskritai praneša: jei praneša – jos tikslesnės už bet kokį spėjimą, ir
+  // kištis nereikia. Nuliai reiškia seną WebView Android 15 telefone, ir tada
+  // atsargas paduoda native pusė.
+  useEffect(() => {
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;" +
+      "padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)";
+    document.body.appendChild(probe);
+    const cs = getComputedStyle(probe);
+    const reported = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    probe.remove();
+    if (reported > 0) return;
+    systemBarInsets().then((i) => {
+      if (!i) return;
+      document.documentElement.style.setProperty("--sa-top", `${i.top}px`);
+      document.documentElement.style.setProperty("--sa-bottom", `${i.bottom}px`);
+    });
+  }, []);
+
   useEffect(() => {
     initStatusBar();
     (async () => {
@@ -2693,6 +2882,12 @@ export default function App() {
     });
   };
 
+  // Pranešimo veiksmo klausytojas registruojamas vieną kartą ir toliau matytų
+  // tik pirmąją būseną. Priminimams perplanuoti reikia dabartinių vaistų ir
+  // dabartinės kalbos, tad laikom šviežias nuorodas.
+  const dataRef = useRef(data);
+  useEffect(() => { dataRef.current = data; }, [data]);
+
   const resetAll = async () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     pending.current = null;
@@ -2715,11 +2910,13 @@ export default function App() {
 
   const lang = data.settings?.lang || "lt";
   const t = useMemo(() => ({ ...(STR[lang] || STR.lt), n: NOTIF[lang] || NOTIF.lt }), [lang]);
+  const tRef = useRef(t);
+  useEffect(() => { tRef.current = t; }, [t]);
   const lc = localeOf(lang);
 
   // priminimai perplanuojami pasikeitus vaistams, kalbai ar jungikliui,
   // ir papildomi kiekvieną grįžimą iš fono — tvarkaraštis siekia 14 d. į priekį
-  const medSig = JSON.stringify(data.meds.map((m) => [m.id, m.name, m.dose, m.times]));
+  const medSig = JSON.stringify(data.meds.map((m) => [m.id, m.name, m.dose, m.times, m.doses]));
   const notify = data.settings?.notify !== false;
   useEffect(() => {
     if (!loaded) return;
@@ -2734,15 +2931,19 @@ export default function App() {
   // Anksti pažymėta dozė būtų perrašyta įkeltais duomenimis ir tyliai dingtų.
   useEffect(() => {
     if (!loaded) return;
-    return onDoseAction(({ medId, time, dk }) => {
+    return onDoseAction(({ medIds, time, dk }) => {
+      const at = new Date().toISOString();
       update((d) => {
         const day = { ...(d.doseLog[dk] || {}) };
-        const k = `${medId}@${time}`;
-        if (!day[k]) day[k] = new Date().toISOString();
+        medIds.forEach((id) => { const k = `${id}@${time}`; if (!day[k]) day[k] = at; });
         d.doseLog[dk] = day;
         return d;
       });
-      cancelDose(medId, time, dk);   // nutildom šios dozės pakartojimą po 30 min
+      // pažymėti visi, kurie žinutėje ir buvo išvardyti, tad pakartojimo nebereikia
+      const cur = dataRef.current;
+      const day = { ...(cur.doseLog[dk] || {}) };
+      medIds.forEach((id) => { day[`${id}@${time}`] = at; });
+      syncDoseSlot(cur.meds, { ...cur.doseLog, [dk]: day }, tRef.current, time, dk, cur.settings?.notify !== false);
     });
   }, [loaded]);
 
@@ -2894,7 +3095,7 @@ export default function App() {
       <style>{GLOBAL_CSS}</style>
       {/* flex stulpelis, kad atsakomybės tekstas gulėtų ekrano apačioje, o ne kabėtų
           iškart po turiniu: tuščiuose skirtukuose tarp jo ir juostos likdavo didelė properša */}
-      <div style={{ width: "100%", maxWidth: 480, padding: "calc(22px + env(safe-area-inset-top)) 16px 104px",
+      <div style={{ width: "100%", maxWidth: 480, padding: "calc(22px + var(--sa-top)) 16px calc(104px + var(--sa-bottom))",
                     display: "flex", flexDirection: "column" }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -2973,7 +3174,7 @@ export default function App() {
       {showFeedback && <FeedbackSheet data={data} t={t} onClose={() => setShowFeedback(false)} />}
 
       <div style={{
-        position: "fixed", bottom: "calc(70px + env(safe-area-inset-bottom))", left: "50%",
+        position: "fixed", bottom: "calc(70px + var(--sa-bottom))", left: "50%",
         transform: "translateX(-50%)", width: "100%", maxWidth: 480, zIndex: 20,
         display: "flex", justifyContent: "flex-end", pointerEvents: "none",
       }}>
@@ -2991,7 +3192,7 @@ export default function App() {
       <nav data-tour="nav" style={{
         position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
         width: "100%", maxWidth: 480, background: C.card, borderTop: `1px solid ${C.line}`,
-        display: "flex", padding: "7px 2px calc(7px + env(safe-area-inset-bottom))",
+        display: "flex", padding: "7px 2px calc(7px + var(--sa-bottom))",
       }}>
         {TABS.map(({ id, key, icon: Icon }) => {
           const active = tab === id;

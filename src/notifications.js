@@ -1,6 +1,6 @@
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Capacitor } from "@capacitor/core";
-import { dkey, addDays, doseAt, notifId, doseKey, followKey } from "./dates";
+import { dkey, addDays, dayFrom, doseAt, notifId, slotKey, slotFollowKey, doseInSchedule, doseFor } from "./dates";
 
 export const isNative = () => Capacitor.isNativePlatform();
 const isAndroid = () => Capacitor.getPlatform() === "android";
@@ -64,7 +64,11 @@ export function onDoseAction(cb) {
   const h = LocalNotifications.addListener("localNotificationActionPerformed", (ev) => {
     if (ev.actionId !== DOSE_ACTION_TAKEN) return;
     const x = ev.notification && ev.notification.extra;
-    if (x && x.medId && x.time && x.dk) cb(x);
+    if (!x || !x.time || !x.dk) return;
+    // `medId` – senos, dar prieš sujungimą suplanuotos žinutės. Jos telefone
+    // gali gulėti iki 14 d., tad abu pavidalus priimam.
+    const ids = Array.isArray(x.medIds) ? x.medIds : x.medId ? [x.medId] : [];
+    if (ids.length) cb({ medIds: ids, time: x.time, dk: x.dk });
   });
   return () => { Promise.resolve(h).then((s) => s && s.remove()).catch(() => {}); };
 }
@@ -90,6 +94,50 @@ export async function cancelAll(keepIds = [BACKUP_ID, ...bedIds()]) {
   if (mine.length) await LocalNotifications.cancel({ notifications: mine });
 }
 
+/** Ko tuo laiku tą dieną dar laukiam: sąraše lieka nepažymėti ir jau galiojantys. */
+function pendingAt(meds, doseLog, time, dk) {
+  const taken = doseLog[dk] || {};
+  return meds.filter((m) => m.times.includes(time)
+    && !taken[`${m.id}@${time}`]              // jau išgerta – nei priminimo, nei pakartojimo
+    && doseInSchedule(m, dk, time));          // vaistas įrašytas vėliau – tos dozės nebuvo
+}
+
+/**
+ * Vieno laiko priminimai: PO VIENĄ pranešimą, kad ir kiek vaistų tuo metu geriama.
+ *
+ * Du vaistai 08:00 anksčiau duodavo du vienodus pranešimus vienas ant kito, o po
+ * 30 min – dar du. Realiai tai vienas veiksmas: išgeriama viskas, kas tuo metu
+ * geriama. Todėl vardai surašomi į vieną kūną, o „Išgėriau“ pažymi visus iš karto –
+ * pranešime išvardyti būtent tie, kurie dar nepažymėti.
+ */
+function slotNotifications(meds, doseLog, t, time, dk, now = new Date()) {
+  const due = pendingAt(meds, doseLog, time, dk);
+  if (!due.length) return [];
+  const at = doseAt(dayFrom(dk), time);
+  const fu = new Date(at.getTime() + FOLLOWUP_MIN * 60000);
+  const base = {
+    channelId: "meds", smallIcon: "ic_stat_aura",
+    actionTypeId: DOSE_ACTION_TYPE, extra: { medIds: due.map((m) => m.id), time, dk },
+  };
+  const out = [];
+  if (at > now) {
+    out.push({
+      ...base, id: notifId(slotKey(time, dk)),
+      title: t.n.title,
+      body: t.n.body(due.map((m) => `${m.name}${doseFor(m, time) ? " " + doseFor(m, time) : ""}`)),
+      schedule: { at, allowWhileIdle: true },
+    });
+  }
+  if (fu > now) {
+    out.push({
+      ...base, id: notifId(slotFollowKey(time, dk)),
+      title: t.n.fuTitle, body: t.n.fuBody(due.map((m) => m.name)),
+      schedule: { at: fu, allowWhileIdle: true },
+    });
+  }
+  return out;
+}
+
 /**
  * Sudaro konkrečių laiko taškų sąrašą artimiausioms dienoms.
  *
@@ -97,44 +145,21 @@ export async function cancelAll(keepIds = [BACKUP_ID, ...bedIds()]) {
  * DND, riboja Doze, o po force-stop jie nebeatsistato. Todėl planuojam tikslius
  * `at` momentus ir papildom sąrašą kiekvieną kartą atidarius programėlę.
  *
- * Kiekvienai nepažymėtai dozei — VIENAS pakartojimas po 30 min. Be eskalacijos:
+ * Kiekvienam nepažymėtam laikui — VIENAS pakartojimas po 30 min. Be eskalacijos:
  * begalinis kalimas baigiasi tuo, kad vartotojas išjungia pranešimus visai.
+ *
+ * Biudžetas skaičiuojamas laikais, ne vaistais: sujungus priminimus, penki vaistai
+ * dviem laikais telpa į tiek pat pranešimų, kiek vienas vaistas.
  */
 export function planNotifications(meds, doseLog, t, now = new Date()) {
-  const perDay = meds.reduce((a, m) => a + m.times.length, 0);
-  if (!perDay) return [];
-  const days = Math.max(1, Math.min(HORIZON_DAYS, Math.floor(MAX_PENDING / (perDay * 2))));
+  const times = [...new Set(meds.flatMap((m) => m.times))].sort();
+  if (!times.length) return [];
+  const days = Math.max(1, Math.min(HORIZON_DAYS, Math.floor(MAX_PENDING / (times.length * 2))));
   const out = [];
 
   for (let d = 0; d < days; d++) {
-    const day = addDays(now, d);
-    const dk = dkey(day);
-    const taken = doseLog[dk] || {};
-    for (const m of meds) {
-      for (const time of m.times) {
-        if (taken[`${m.id}@${time}`]) continue;   // jau išgerta – nei priminimo, nei pakartojimo
-        const at = doseAt(day, time);
-        const base = {
-          channelId: "meds", smallIcon: "ic_stat_aura",
-          actionTypeId: DOSE_ACTION_TYPE, extra: { medId: m.id, time, dk },
-        };
-        if (at > now) {
-          out.push({
-            ...base, id: notifId(doseKey(m.id, time, dk)),
-            title: t.n.title, body: t.n.body(m),
-            schedule: { at, allowWhileIdle: true },
-          });
-        }
-        const fu = new Date(at.getTime() + FOLLOWUP_MIN * 60000);
-        if (fu > now) {
-          out.push({
-            ...base, id: notifId(followKey(m.id, time, dk)),
-            title: t.n.fuTitle, body: t.n.fuBody(m),
-            schedule: { at: fu, allowWhileIdle: true },
-          });
-        }
-      }
-    }
+    const dk = dkey(addDays(now, d));
+    for (const time of times) out.push(...slotNotifications(meds, doseLog, t, time, dk, now));
   }
   return out;
 }
@@ -159,31 +184,28 @@ export async function syncMedReminders(meds, doseLog, t, enabled) {
   return { ok: true, scheduled: notifications.length };
 }
 
-/** Pažymėjus dozę – nutildom tik ją, viso tvarkaraščio neperkuriam. */
-export async function cancelDose(medId, time, dk) {
+/**
+ * Perplanuoja VIENO laiko priminimą, viso tvarkaraščio neliesdamas.
+ *
+ * Kviečiama pažymėjus arba atžymėjus dozę. Kadangi pranešimas bendras, pažymėjus
+ * vieną iš dviejų to paties laiko vaistų jo tiesiog nutildyti negalima – jį reikia
+ * perrašyti taip, kad liktų tik antrasis. Todėl visada pirma atšaukiam, paskui
+ * sudarom iš naujo pagal ką tik pasikeitusį žurnalą.
+ *
+ * `doseLog` privalo būti JAU atnaujintas: React būsena atsinaujina vėliau, tad
+ * kviečiantysis paduoda tai, kaip žurnalas atrodys.
+ */
+export async function syncDoseSlot(meds, doseLog, t, time, dk, enabled) {
   if (!isNative()) return;
   try {
     await LocalNotifications.cancel({ notifications: [
-      { id: notifId(doseKey(medId, time, dk)) },
-      { id: notifId(followKey(medId, time, dk)) },
+      { id: notifId(slotKey(time, dk)) },
+      { id: notifId(slotFollowKey(time, dk)) },
     ] });
   } catch (e) { /* galėjo jau būti pristatyta */ }
-}
-
-/** Atšaukus pažymėjimą – grąžinam priminimus, kurių laikas dar nepraėjo. */
-export async function restoreDose(med, time, dk, t) {
-  if (!isNative()) return;
+  if (!enabled) return;
   if ((await permissionState()) !== "granted") return;
-  const at = doseAt(new Date(dk.replace(/-/g, "/")), time);
-  const fu = new Date(at.getTime() + FOLLOWUP_MIN * 60000);
-  const now = new Date();
-  const base = {
-    channelId: "meds", smallIcon: "ic_stat_aura",
-    actionTypeId: DOSE_ACTION_TYPE, extra: { medId: med.id, time, dk },
-  };
-  const notifications = [];
-  if (at > now) notifications.push({ ...base, id: notifId(doseKey(med.id, time, dk)), title: t.n.title, body: t.n.body(med), schedule: { at, allowWhileIdle: true } });
-  if (fu > now) notifications.push({ ...base, id: notifId(followKey(med.id, time, dk)), title: t.n.fuTitle, body: t.n.fuBody(med), schedule: { at: fu, allowWhileIdle: true } });
+  const notifications = slotNotifications(meds, doseLog, t, time, dk);
   if (notifications.length) await LocalNotifications.schedule({ notifications });
 }
 
