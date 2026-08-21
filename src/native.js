@@ -2,6 +2,7 @@ import { Capacitor } from "@capacitor/core";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { App as CapApp } from "@capacitor/app";
+import { Share } from "@capacitor/share";
 
 export const isNative = () => Capacitor.isNativePlatform();
 const isAndroid = () => Capacitor.getPlatform() === "android";
@@ -49,6 +50,28 @@ export function onBackButton(handler) {
 
 export function exitApp() {
   if (isNative()) CapApp.exitApp();
+}
+
+/**
+ * Dalinimosi langas atsiliepimui.
+ *
+ * `mailto:` reikalauja, kad telefone būtų sukonfigūruota pašto programa. Jos
+ * neturint niekas neįvyksta ir apie tai nepranešama. Dalinimasis veikia ir tada,
+ * bet adresatą renkasi vartotojas, todėl čia jis yra antras kelias, ne pirmas.
+ *
+ * Grąžina `false`, kai langas neatsidarė arba vartotojas jį atšaukė, kad
+ * sąsaja neteigtų įvykus to, kas neįvyko.
+ */
+export async function shareText(title, text) {
+  if (!isNative()) return false;
+  try {
+    const can = await Share.canShare();
+    if (!can.value) return false;
+    await Share.share({ title, text, dialogTitle: title });
+    return true;
+  } catch (e) {
+    return false;   // atšaukimas irgi patenka čia: Capacitor meta klaidą
+  }
 }
 
 /**
