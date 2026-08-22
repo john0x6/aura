@@ -1,4 +1,4 @@
-# Aura: projekto perdavimas (v2.0 / ataskaita, sujungti priminimai, dozės pagal laiką)
+# Aura: projekto perdavimas (v2.1 / ataskaita, sujungti priminimai, dozės pagal laiką, planšetės)
 
 Įklijuok šį failą į naują pokalbį. Kodas yra `C:\Users\Vartotojas\Desktop\aura`.
 
@@ -160,6 +160,32 @@ pailgintų. Jei gydytojui reikia detalių, jos yra `Pastabose` ir dienyne.
 - **Neištestuota telefone.** Naršyklėje `--sa-*` išsisprendžia į 0 px ir maketas nepakito,
   bet ar Xiaomi WebView praneša insets — matysis tik APK'e. Jei antraštė atsidurtų po
   laikrodžiu, kaltas zondas: reiškia `env()` grąžino ne nulį, bet neteisingą reikšmę.
+
+### Planšetės ir gulsčias telefonas
+
+- Iki tol viskas gyveno 480 px stulpelyje. Planšetėje tai atrodė kaip nebaigtas maketas:
+  siaura juostelė ekrano viduryje, o apačioje kabanti 480 px sala su brūkšneliu, kuris
+  baigiasi tuštumoje.
+- **Riba `WIDE_BP = 720` px** (7 col planšetė portretu duoda 800, telefonas gulsčias 844).
+  Virš jos: turinio stulpelis 600 px, skirtukų juosta per visą plotį su mygtukais tame
+  pačiame 600 px stulpelyje, lapai (`Sheet`) tampa langu ekrano viduryje, ataskaita –
+  du stulpeliai (`.rgrid`), jos lapas platesnis už kitus (`roomy`, 780 px).
+- **Riba per CSS medijos užklausą, ne per JS.** Pirmas variantas buvo `useWide()` kabliukas
+  su `matchMedia` + `resize` + `orientationchange`; naršyklėje pasukus langą nesuveikė nė
+  vienas iš trijų, ir maketas liko toks, koks buvo paleidžiant. `ResizeObserver` suveikė, bet
+  tai jau trys atsarginiai keliai tam, ką CSS padaro be jokių įvykių. Kabliukas pašalintas.
+  **Nedaryk atgal į JS.**
+- Stulpelis platėja saikingai (600, ne per visą ekraną): dienynas yra skaitomas tekstas, o
+  eilutė per visą planšetės plotį skaitosi blogiau, ne geriau.
+- Klasės gyvena `GLOBAL_CSS`: `.col`, `.sheetWrap`, `.sheet`, `.sheet.roomy`, `.rgrid`.
+  Konstantos `COL`, `COL_WIDE`, `WIDE_BP` įrašomos į CSS per šablono eilutę, tad skaičius
+  keisti reikia vienoje vietoje. **`GLOBAL_CSS` yra template literal — atgalinių kabučių
+  komentaruose rašyti negalima**, sulaužo bylą (jau lūžo kartą).
+- Android pusėje nieko keisti nereikėjo: manifeste nėra `screenOrientation`, o `configChanges`
+  apima `orientation|screenSize`, tad programėlė sukiojasi ir keičia dydį laisvai.
+- Patikrinta naršyklėje ties 375×812, 768×1024, 1280×800 ir 844×390: ataskaita gulsčiame
+  telefone anksčiau rodė 24 % turinio, dabar 34 %, planšetėje – 87 %. Telefono maketas
+  nepakito nė vienu pikseliu.
 
 ---
 

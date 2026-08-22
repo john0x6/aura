@@ -72,6 +72,14 @@ const T = {
   body: "'IBM Plex Sans Variable', system-ui, sans-serif",
 };
 
+/**
+ * Plataus ekrano riba. 720 px yra ten, kur baigiasi telefonas: 7 colių planšetė
+ * portretu duoda 800, telefonas gulsčias – 844. Iki tol viskas gyveno 480 px
+ * stulpelyje, ir dideliame ekrane tai atrodė kaip nebaigtas maketas.
+ */
+const WIDE_BP = 720;
+const COL = 480, COL_WIDE = 600;
+
 const GLOBAL_CSS = `
 /* Tema keičiama data-theme atributu ant <html>. „auto“ paklūsta telefono temai,
    „light“ ir „dark“ ją nustelbia – todėl sistemos užklausa taikoma tik auto. */
@@ -99,6 +107,31 @@ input, textarea, select, button { font-family: inherit; color: inherit; }
 /* Gido „parodyti“: vienkartinis lėtas atsiradimas, be pulsavimo ir be kartojimo.
    Mirksintis kontūras būtų būtent tas dažnis, kurio čia vengiam. */
 @keyframes tourIn { from { opacity: 0 } to { opacity: 1 } }
+/* Platus ekranas.
+   Riba per CSS, o ne per JS: planšetę pasukus ar programėlę patempus į pusę
+   ekrano, resize, orientationchange ir matchMedia įvykiai WebView'e nebūtinai
+   ateina, ir maketas liktų toks, koks buvo paleidžiant. Medijos užklausai
+   pranešimų nereikia.
+
+   Stulpelis platėja saikingai (600, ne per visą ekraną): dienynas yra skaitomas
+   tekstas, o eilutė per visą planšetės plotį skaitosi blogiau, ne geriau. */
+.col { max-width: ${COL}px }
+.sheetWrap { align-items: flex-end }
+.sheet {
+  max-width: ${COL}px; max-height: 88vh; border-radius: 18px 18px 0 0;
+  padding: 18px 18px calc(28px + var(--sa-bottom));
+}
+.rgrid { display: grid; gap: 14px; margin-top: 18px; align-items: start; grid-template-columns: 1fr }
+@media (min-width: ${WIDE_BP}px) {
+  .col { max-width: ${COL_WIDE}px }
+  /* lapas iš apačios tampa langu ekrano viduryje: gulsčiame telefone 88 vh yra
+     340 px, ir ataskaita tokiame plyšyje slenkama per keturis ekranus */
+  .sheetWrap { align-items: center; padding: 16px }
+  .sheet { max-width: ${COL_WIDE}px; max-height: 94vh; border-radius: 18px; padding: 18px 20px 22px }
+  /* ataskaita vienintelė turi du stulpelius, ir 600 px juose paliktų po 266 px */
+  .sheet.roomy { max-width: 780px }
+  .rgrid { grid-template-columns: 1fr 1fr }
+}
 /* native: jokio teksto žymėjimo laikant pirštą ir jokio „gumos“ efekto krašte */
 body { overscroll-behavior-y: none; }
 #root { -webkit-touch-callout: none; }
@@ -828,11 +861,19 @@ function DeleteBtn({ onConfirm, t }) {
   return <button onClick={() => setArmed(true)} aria-label={t.del} style={iconBtn}><Trash2 size={16} /></button>;
 }
 
-function Sheet({ title, onClose, children, t }) {
+/**
+ * Lapas iš apačios – telefone. Plačiame ekrane (žr. `.sheet` medijos užklausą)
+ * jis tampa langu ekrano viduryje. `roomy` – lapams, kuriems ten verta ir
+ * papildomo pločio; kol kas tokia yra tik ataskaita su dviem stulpeliais.
+ */
+function Sheet({ title, onClose, children, t, roomy }) {
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+    <div className="sheetWrap" style={{ position: "fixed", inset: 0, zIndex: 50,
+                  display: "flex", justifyContent: "center" }}>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: C.sh4 }} />
-      <div style={{ position: "relative", width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", background: C.bg, borderRadius: "18px 18px 0 0", padding: "18px 18px calc(28px + var(--sa-bottom))", boxShadow: `0 -4px 24px ${C.sh2}` }}>
+      <div className={roomy ? "sheet roomy" : "sheet"}
+           style={{ position: "relative", width: "100%", overflowY: "auto",
+                    background: C.bg, boxShadow: `0 -4px 24px ${C.sh2}` }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div style={{ fontFamily: T.serif, fontSize: 20, fontWeight: 600 }}>{title}</div>
           <button onClick={onClose} aria-label={t.close} style={iconBtn}><X size={20} /></button>
@@ -1961,11 +2002,11 @@ function Stat({ label, value, color = C.ink, first }) {
  * Dabar hierarchija yra: du skaičiai, dėl kurių viskas ir renkama, ir po jais –
  * smulkmenos, kurios juos paaiškina.
  */
-function ReportBlock({ title, value, sub, color, rows = [], children }) {
+function ReportBlock({ title, value, sub, color, rows = [], children, span }) {
   const list = rows.filter(Boolean);
   return (
-    <>
-      <SectionLabel>{title}</SectionLabel>
+    <div style={span ? { gridColumn: "1 / -1" } : undefined}>
+      <SectionLabel style={{ margin: "0 4px 8px" }}>{title}</SectionLabel>
       <Card style={{ padding: "13px 15px" }}>
         {value != null && (
           <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
@@ -1980,7 +2021,7 @@ function ReportBlock({ title, value, sub, color, rows = [], children }) {
           </div>
         )}
       </Card>
-    </>
+    </div>
   );
 }
 
@@ -2011,10 +2052,15 @@ function ReportSheet({ data, onClose, t }) {
   ];
 
   return (
-    <Sheet title={t.report} onClose={onClose} t={t}>
+    <Sheet title={t.report} onClose={onClose} t={t} roomy>
       <div style={{ display: "flex", gap: 8 }}>
         {[30, 90].map((n) => <Chip key={n} active={days === n} onClick={() => setDays(n)}>{t.rDays(n)}</Chip>)}
       </div>
+
+      {/* Planšetėje ir gulsčiame telefone blokai gula į du stulpelius (`.rgrid`):
+          ataskaita yra tas ekranas, kuris rodomas gydytojui, o slinkti per jį
+          stovint prie žmogaus yra blogiausias momentas. */}
+      <div className="rgrid">
 
       <ReportBlock title={t.rSeiz} value={r.seiz.length} color={C.plum} rows={seizRows}
         sub={`${dkey(r.since).slice(5)} – ${dkey(new Date()).slice(5)}`} />
@@ -2050,19 +2096,21 @@ function ReportSheet({ data, onClose, t }) {
 
       {wellRows.some(Boolean) && <ReportBlock title={t.tWell} rows={wellRows} />}
 
+      {/* pastabos – per abu stulpelius: tai ištisas tekstas, ne skaičių eilutės */}
       {r.notes.length > 0 && (
-        <>
-          <SectionLabel>{t.rNotes}</SectionLabel>
-          <Card style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <ReportBlock title={t.rNotes} span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {r.notes.map((n, i) => (
               <div key={i} style={{ fontSize: 13.5, lineHeight: 1.5 }}>
                 <span style={{ color: C.sub, fontWeight: 600 }}>{n.k}{n.who ? ` · ${n.who}` : ""}</span>
                 <div style={{ whiteSpace: "pre-wrap" }}>{n.text}</div>
               </div>
             ))}
-          </Card>
-        </>
+          </div>
+        </ReportBlock>
       )}
+      </div>
+
       <PrimaryBtn onClick={copy} style={{ marginTop: 14 }}>{copied ? t.copied : t.copyText}</PrimaryBtn>
       {/* paaiškinimas apie apytikslį procentą – tik tada, kai procentas apskritai rodomas */}
       {r.adh != null && <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>{t.rNote}</div>}
@@ -2171,7 +2219,7 @@ function SeizureTimer({ timer, t, onEnd, onDiscard, onConfirmStale }) {
 function SetupSheet({ t, lang, name, notify, perm, onLang, onName, onNotify, onDone }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 130, background: C.bg, overflowY: "auto" }}>
-      <div style={{ maxWidth: 480, margin: "0 auto", padding: "calc(34px + var(--sa-top)) 20px calc(40px + var(--sa-bottom))" }}>
+      <div style={{ maxWidth: COL_WIDE, margin: "0 auto", padding: "calc(34px + var(--sa-top)) 20px calc(40px + var(--sa-bottom))" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <AuraMark size={40} />
           <div>
@@ -3095,7 +3143,7 @@ export default function App() {
       <style>{GLOBAL_CSS}</style>
       {/* flex stulpelis, kad atsakomybės tekstas gulėtų ekrano apačioje, o ne kabėtų
           iškart po turiniu: tuščiuose skirtukuose tarp jo ir juostos likdavo didelė properša */}
-      <div style={{ width: "100%", maxWidth: 480, padding: "calc(22px + var(--sa-top)) 16px calc(104px + var(--sa-bottom))",
+      <div className="col" style={{ width: "100%", padding: "calc(22px + var(--sa-top)) 16px calc(104px + var(--sa-bottom))",
                     display: "flex", flexDirection: "column" }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -3173,9 +3221,9 @@ export default function App() {
         onRestored={async () => { const p = await loadData(); if (p) setData(hydrate(p)); }} />}
       {showFeedback && <FeedbackSheet data={data} t={t} onClose={() => setShowFeedback(false)} />}
 
-      <div style={{
+      <div className="col" style={{
         position: "fixed", bottom: "calc(70px + var(--sa-bottom))", left: "50%",
-        transform: "translateX(-50%)", width: "100%", maxWidth: 480, zIndex: 20,
+        transform: "translateX(-50%)", width: "100%", zIndex: 20,
         display: "flex", justifyContent: "flex-end", pointerEvents: "none",
       }}>
         <button className="press" aria-label={timer ? t.seizEnd : t.seizStart}
@@ -3189,11 +3237,15 @@ export default function App() {
         </button>
       </div>
 
+      {/* juosta per visą plotį, o mygtukai – turinio stulpelyje: 480 px sala
+          planšetės viduryje su brūkšneliu, kuris baigiasi tuštumoje, atrodo
+          kaip klaida, o ne kaip sprendimas */}
       <nav data-tour="nav" style={{
-        position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
-        width: "100%", maxWidth: 480, background: C.card, borderTop: `1px solid ${C.line}`,
-        display: "flex", padding: "7px 2px calc(7px + var(--sa-bottom))",
+        position: "fixed", bottom: 0, left: 0, right: 0,
+        background: C.card, borderTop: `1px solid ${C.line}`,
+        display: "flex", justifyContent: "center", padding: "7px 2px calc(7px + var(--sa-bottom))",
       }}>
+        <div className="col" style={{ display: "flex", width: "100%" }}>
         {TABS.map(({ id, key, icon: Icon }) => {
           const active = tab === id;
           return (
@@ -3205,6 +3257,7 @@ export default function App() {
             </button>
           );
         })}
+        </div>
       </nav>
     </div>
   );
