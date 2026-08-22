@@ -1,4 +1,4 @@
-# Aura: projekto perdavimas (v2.1 / ataskaita, sujungti priminimai, dozės pagal laiką, planšetės)
+# Aura: projekto perdavimas (v2.2 / ataskaita, sujungti priminimai, dozės pagal laiką, planšetės)
 
 Įklijuok šį failą į naują pokalbį. Kodas yra `C:\Users\Vartotojas\Desktop\aura`.
 
@@ -513,11 +513,10 @@ vaistų žymėjimą bei dienyną. Vietoj to laisvas tekstas nuvestas į ataskait
 
 ## Neišspręstos problemos
 
-**1. Gradle build niekada nebuvo paleistas.** Tebėra didžiausia rizika projekte. Workflow kiekvieną
-kartą iš naujo generuoja `android/`, regex'u laužiasi į manifestą, generuoja piktogramas;
-keturios vietos, kur gali lūžti, ir nė viena nė karto neveikė. Šioje sesijoje workflow'as
-sutvirtintas (žr. aukščiau), bet **sutvirtintas ≠ paleistas**. Kol nėra APK, visa kita yra teorija.
-Lūžus, imk `gradle-reports` artifact'ą.
+**1. ~~Gradle build niekada nebuvo paleistas.~~ IŠSPRĘSTA.** 2026-08-22 duomenimis workflow'as
+praėjo 13 kartų iš 13, įskaitant abu šios dienos commit'us (~2 min 50 s vienas). Visos keturios
+vietos, kur galėjo lūžti — `cap add android`, manifesto regex, piktogramų generavimas,
+Gradle — veikia. Lūžus ateityje imk `gradle-reports` artifact'ą.
 
 **2. Sugadinti duomenys nuslepiami ir perrašomi.** `App.jsx` `loadData()` klaida gaudoma su
 komentaru „dar nėra įrašų“, bet į tą patį `catch` patenka ir `JSON.parse` klaida. Programėlė
@@ -557,12 +556,36 @@ ir po valandos `seizStale` duos šiukšlinę trukmę.
 
 ---
 
+## Simuliatorius (SIM)
+
+Ne šioje repozitorijoje: `C:\Users\Vartotojas\SIM`, atskiras git (`MrMoon249/SIM`).
+Kęstučio parašytas telefono simuliatorius — paleidžia Auros web dalį telefono rėme su
+suklastotu Capacitor tiltu, tad `isNativePlatform()` grąžina `true` ir veikia keliai, kurių
+naršyklėje pasiekti neįmanoma. Portas 5180, paleidimas `paleisti-be-perkurimo.cmd`.
+
+**Prieš tikrinant: `npm run build`, o skydelyje „Programėlės šaltinis" rinkis „dist".**
+Aktyvus šaltinis gyvena SERVERIO atmintyje, tad kartą pasirinktas APK lieka pasirinktas ir
+kitą dieną. 2026-08-22 dėl to pusvalandį buvo žiūrima į rugpjūčio 21 d. paketą; nuo SIM
+`ff74815` po sąrašu užsidega įspėjimas, jei pasirinktas APK senesnis už `dist`.
+
+Ką juo patikrinsi, ko naršyklė neparodo:
+
+- suplanuotus pranešimus su ID ir laikais, jų iškvietimą nelaukiant realaus laiko;
+- „Išgėriau" mygtuką pranešime ir ką jis pažymi;
+- `StatusBar.getInfo()` atsargos kelią, kai `env(safe-area-inset-*)` grąžina nulius
+  (juostos aukštis keičiamas: 28 / 36 / 44 dp);
+- Android 15 vs 13 elgesį, kelionę laike, sistemos temą, „atgal" mygtuką.
+
+Ko nepatikrinsi: tikrų `env()` reikšmių, Doze ir Xiaomi apribojimų, Java dalies.
+
+---
+
 ## Kas NEIŠTESTUOTA realiame telefone
 
 1. ~~Pranešimų grandinė~~, **patikrinta, veikia** (žr. žemiau apie Xiaomi).
 2. **Laikmatis per naktį**: startas, programėlės uždarymas, 6 min, atidarymas.
 3. **Atsarginė kopija**: ar atsidaro Android dalinimosi langas.
-4. **Gradle build**: niekada nepaleistas.
+4. ~~**Gradle build**~~: paleistas ir žalias 13 kartų iš 13.
 5. **Miego priminimas**: logika patikrinta vienetiniais testais, telefone ne.
 6. **Tamsi tema**: patikrinta apskaičiuotais stiliais ir kontrasto matematika, akimis nematyta.
 7. **„Išgėriau" mygtukas pranešime**: naršyklėje netikrinamas iš principo (`isNative()` = false).
@@ -573,14 +596,18 @@ ir po valandos `seizStale` duos šiukšlinę trukmę.
 9. **Atsiliepimo siuntimas.** `mailto:` per `location.href` ir „Siųsti kitaip“ per
    `@capacitor/share` abu yra native keliai. Naršyklėje patikrinta tik tai, kad
    diagnostikos blokas susirenka teisingai ir kad dalinimosi mygtukas web'e nerodomas.
-10. **Sujungtas priminimas telefone.** Naršyklėje patikrinta tik `planNotifications` ir
-    `slotNotifications` išvestis. Ar viena žinutė su dviem vaistais atrodo gerai ir ar
-    „Išgėriau" pažymi abu, matysis tik APK'e. Ten pat matysis ir tai, kaip atrodo perėjimas:
-    telefone dar gulinčios senos žinutės turi `extra.medId`.
-11. **Edge-to-edge Android 15 telefone.** `adjustMarginsForEdgeToEdge: "disable"` ir
-    `--sa-top` / `--sa-bottom`. Naršyklėje insets yra 0 px, tad tikrinta tik tai, kad
-    maketas nepakito. Telefone matysis dvejopai: ar juostų vietoje dabar programėlės fonas,
-    ir ar antraštė su skirtukų juosta nepakliuvo po sistemos juostomis.
+10. **Sujungtas priminimas telefone.** Simuliatoriuje (žr. skyrių aukščiau) grandinė praeina
+    visa: viena 08:00 žinutė su abiem vaistais, vienas „Išgėriau" paspaudimas pažymi abu,
+    suplanuotų skaičius nukrinta 54 → 52. Telefone lieka tik tai, ko simuliatorius neturi:
+    kaip žinutė atrodo tikroje šutorėje ir kaip praeina perėjimas — telefone dar gulinčios
+    senos žinutės turi `extra.medId`, ne `medIds` (abu pavidalai priimami).
+11. **Edge-to-edge Android 15 telefone.** Simuliatoriuje ATSARGINIS kelias patikrintas:
+    Android 15 režimu `env()` grąžina nulius, programėlė krenta į `StatusBar.getInfo()`,
+    ir `--sa-top` užsipildo (28 dp duoda 50 px antraštės padding, 44 dp — 66 px);
+    Android 13 režimu atsarga neįjungiama ir lieka 0. **Neatsakyta lieka viena:** ar tikras
+    Xiaomi WebView `env(safe-area-inset-*)` praneša, ir ar teisingai. Jei praneša neteisingą
+    NENULINĘ reikšmę, zondas atsarginio kelio neįjungs ir antraštė atsidurs po laikrodžiu —
+    tai bus ženklas sugriežtinti zondą.
 12. **Apžvalgos slinkimo užraktas telefone.** Patikrinta naršyklėje: `body` ir `html`
     `overflow` tampa `hidden` kartu su matavimu ir atsileidžia išeinant, o žiedo padėtis
     sutampa su taikiniu per 6 px `pad`. Ar `touchAction: "none"` sustabdo pirštą realiame
@@ -610,6 +637,18 @@ ir po valandos `seizStale` duos šiukšlinę trukmę.
 - Apžvalga su dviem vaistais: visi 8 žingsniai, žiedas ties taikiniu, taikinys ekrane.
 - `--sa-top` / `--sa-bottom` išsisprendžia į 0 px, skirtukų juostos ir lapų maketas nepakitęs.
 - `npm run build` praeina.
+
+### Kas patikrinta simuliatoriuje šioje sesijoje
+
+Pirmas kartas, kai native keliai apskritai buvo paleisti — iki tol jie egzistavo tik teorijoje.
+
+- **Insets atsarginis kelias.** Android 15: `--sa-top: 28px`, `--sa-bottom: 24px`, antraštės
+  padding 50 px. Su 44 dp juosta: `--sa-top: 44px`, padding 66 px — maketas atlaiko.
+  Android 13: abi reikšmės 0 px, padding 22 px, langą įsprausdina pati sistema.
+- **Sujungti priminimai.** Suplanuota 54; 08:00 — viena žinutė „Levetiracetamas 500 mg ·
+  Lamotriginas 100 mg"; 20:00 — „Levetiracetamas 1000 mg" (dozė pagal laiką). Paspaudus
+  „Išgėriau" pažymėti abu vaistai (`m1@08:00` ir `m2@08:00`), suplanuotų skaičius 54 → 52,
+  t. y. nusiėmė ir pakartojimas po 30 min.
 
 ### Kas patikrinta naršyklėje v1.7 sesijoje
 
