@@ -22,7 +22,10 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: android-actions/setup-android@v3
+      # v3 lūžo 2026-10 (žingsnis krisdavo prieš pradedant statyti): v4.0.2 jau
+      # taiso „removed tools package", o v4.0.0 perėjo į Node 24, į kurį runneriai
+      # dabar verčia visas actions
+      - uses: android-actions/setup-android@v4
 
       # compileSdk 35 build-tools Gradle parsisiunčia pats, bet tik jei licencija
       # priimta — kitaip lūžis su nieko nesakančiu pranešimu
