@@ -2894,12 +2894,23 @@ export default function App() {
   const saveTimer = useRef(null);
   const pending = useRef(null);
 
-  const flush = async () => {
+  // Įrašymai eina viena eile, o `flush` grąžina pažadą, kuris baigiasi tik kai
+  // duomenys tikrai diske. Anksčiau `pending` būdavo nunulinamas dar prieš
+  // `await`, todėl antras `flush` iškart grįždavo, nors pirmasis dar rašė —
+  // ir kas skaitė diską tuo metu (žr. `reloadFromDisk`), gaudavo senesnę versiją
+  // nei atmintyje. Eilė dar garantuoja tvarką: vėlesnė būsena niekada
+  // neperrašo savęs senesne.
+  const inflight = useRef(Promise.resolve());
+  const flush = () => {
     const payload = pending.current;
-    if (payload === null) return;
+    if (payload === null) return inflight.current;   // nėra ką rašyti, bet palaukiam jau skriejančio
     pending.current = null;
-    try { setStorageOk(await saveData(payload)); }
-    catch (e) { setStorageOk(false); }
+    const run = inflight.current.then(async () => {
+      try { setStorageOk(await saveData(payload)); }
+      catch (e) { setStorageOk(false); }
+    });
+    inflight.current = run;
+    return run;
   };
 
   // rašom ne dažniau kaip kartą per 700 ms — kitaip kiekvienas klaviatūros paspaudimas siųstų užklausą
@@ -2935,6 +2946,43 @@ export default function App() {
   // dabartinės kalbos, tad laikom šviežias nuorodas.
   const dataRef = useRef(data);
   useEffect(() => { dataRef.current = data; }, [data]);
+  const loadedRef = useRef(false);
+  useEffect(() => { loadedRef.current = loaded; }, [loaded]);
+
+  /**
+   * Grįžus iš fono perskaito `aura-data` iš disko ir, jei ten kitaip nei atmintyje,
+   * pakeičia atmintį.
+   *
+   * Kodėl: JS yra vienintelis raktą rašantis procesas, kol jo neimta rašyti kitas
+   * (pvz. pranešimo mygtuko gaviklis be programėlės atidarymo). Atmintyje
+   * laikoma kopija tada tampa sena, ir kitas `update()` ją užrašo ant diske
+   * atsiradusių pakeitimų — o `dayTick` perplanavimas dar ir prikelia
+   * jau pažymėtos dozės priminimą iš pasenusio `doseLog`.
+   *
+   * Tvarka svarbi:
+   *  1. `flush()` pirma — sava neįrašyta būsena turi pasiekti diską, kitaip
+   *     perskaitytume senesnę versiją nei atmintyje ir ja ją pakeistume.
+   *  2. Jei skaitant atsirado nauji vietiniai pakeitimai (`pending`), disko
+   *     versija jau pasenusi — netaikom. Teisingas sprendimas ten būtų sulieti
+   *     rašant, ne atmesti; kol to nėra, vietinis laimi.
+   *  3. Nėra rakto ar jis nesuskaitomas — atmintis lieka. Perkrovimas niekada
+   *     neturi ištrinti to, ką žmogus mato.
+   */
+  const reloading = useRef(null);
+  const reloadFromDisk = () => {
+    if (reloading.current) return reloading.current;   // appStateChange ir visibilitychange ateina kartu
+    const run = (async () => {
+      if (!loadedRef.current) return;                  // pirmas įkėlimas dar nesibaigė
+      await flush();
+      let p;
+      try { p = await loadData(); } catch (e) { return; }
+      if (!p || pending.current !== null) return;
+      const fresh = hydrate(p);
+      if (JSON.stringify(fresh) !== JSON.stringify(dataRef.current)) setData(fresh);
+    })().finally(() => { reloading.current = null; });
+    reloading.current = run;
+    return run;
+  };
 
   const resetAll = async () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -2954,7 +3002,12 @@ export default function App() {
 
   // grįžus iš fono perpiešiam — kitaip po vidurnakčio rodytų vakarykštę dieną
   const [dayTick, bumpDay] = useState(0);
-  useEffect(() => onResume(() => { bumpDay((x) => x + 1); loadTimer().then(setTimer); }), []);
+  // Diena perbraižoma PO perkrovimo, ne kartu: perplanavimas (`dayTick`) turi matyti
+  // šviežią `doseLog`, kitaip jau pažymėta dozė gautų priminimą iš naujo.
+  useEffect(() => onResume(() => {
+    loadTimer().then(setTimer);
+    reloadFromDisk().finally(() => bumpDay((x) => x + 1));
+  }), []);
 
   const lang = data.settings?.lang || "lt";
   const t = useMemo(() => ({ ...(STR[lang] || STR.lt), n: NOTIF[lang] || NOTIF.lt }), [lang]);
